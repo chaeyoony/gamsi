@@ -1,0 +1,3986 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>사업 실적·예산 관리 시스템</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    :root { --sidebar-w: 230px; --accent: #4f6ef7; }
+    body { background: #f0f2f8; font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; }
+
+    /* ── TOPBAR ── */
+    .topbar {
+      position: fixed; top: 0; left: var(--sidebar-w); right: 0;
+      height: 52px; background: #fff; border-bottom: 1px solid #e8eaf0;
+      display: flex; align-items: center; justify-content: flex-end;
+      padding: 0 24px; z-index: 900; gap: 12px;
+    }
+    .year-badge {
+      display: flex; align-items: center; gap: 6px;
+      background: #f0f2f8; border-radius: 20px; padding: 4px 14px;
+      font-size: .85rem; font-weight: 600; color: #333;
+    }
+    .year-badge select {
+      border: none; background: transparent; font-weight: 700;
+      font-size: .85rem; color: var(--accent); cursor: pointer;
+      outline: none; padding: 0;
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      width: var(--sidebar-w); height: 100vh; position: fixed;
+      top: 0; left: 0; background: #1a2340; color: #fff;
+      z-index: 1000; overflow-y: auto; display: flex; flex-direction: column;
+    }
+    .sidebar-brand {
+      padding: 18px 20px; font-size: 1rem; font-weight: 700;
+      border-bottom: 1px solid rgba(255,255,255,.1); flex-shrink: 0;
+    }
+    .sidebar-nav { flex: 1; padding: 8px 0; }
+    .sidebar-section { padding: 14px 20px 4px; font-size: .7rem;
+      text-transform: uppercase; color: rgba(255,255,255,.4); letter-spacing: 1px; }
+    .sidebar-nav a {
+      display: flex; align-items: center; padding: 9px 20px;
+      color: rgba(255,255,255,.65); text-decoration: none;
+      transition: all .15s; font-size: .875rem; gap: 8px;
+    }
+    .sidebar-nav a:hover, .sidebar-nav a.active {
+      color: #fff; background: rgba(255,255,255,.1); border-right: 3px solid var(--accent);
+    }
+    .sidebar-footer { padding: 12px 20px; border-top: 1px solid rgba(255,255,255,.1); }
+    .sidebar-footer a { display: flex; align-items: center; padding: 7px 0;
+      color: rgba(255,255,255,.55); text-decoration: none; font-size: .8rem; gap: 8px; }
+    .sidebar-footer a:hover { color: #fff; }
+    .proj-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── MAIN ── */
+    .main { margin-left: var(--sidebar-w); padding: 76px 24px 24px; min-height: 100vh; }
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* ── CARDS ── */
+    .card-box { background: #fff; border-radius: 12px; padding: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+    .stat-box { background: #fff; border-radius: 12px; padding: 18px 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+
+    /* ── NEW YEAR BANNER ── */
+    .newyear-banner {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff; border-radius: 12px; padding: 16px 20px;
+      margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;
+    }
+
+    /* ── TABS ── */
+    .tab-btn { border: none; background: none; padding: 9px 18px;
+      cursor: pointer; border-bottom: 2px solid transparent;
+      font-size: .875rem; color: #666; transition: all .15s; }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+    /* ── GANTT ── */
+    .gantt-wrap { overflow-x: auto; overflow-y: auto; max-height: calc(100vh - 160px); }
+    .gantt-row { display: flex; align-items: center; border-bottom: 1px solid #f0f0f0; min-height: 46px; }
+    .gantt-label { width: 380px; min-width: 380px; padding: 6px 12px; }
+    .gantt-bars { flex: 1; position: relative; height: 46px; min-width: 336px; }
+    .gantt-grid-line { position: absolute; top: 0; bottom: 0; border-left: 1px dashed #eee; }
+    .gantt-bar { position: absolute; height: 22px; top: 12px; border-radius: 4px; opacity: .85; }
+    .split-sub-row td {
+  border-top: 1px dashed #eee !important;
+  background: #fafbff;
+}
+.split-label {
+  color: #888;
+  font-size: .76rem;
+  padding-left: 6px;
+  white-space: nowrap;
+}
+.gantt-sub-row { display: flex; align-items: center; border-bottom: 1px solid #f5f5f5; min-height: 34px; background: #fafbff; }
+    .gantt-sub-label { width: 380px; min-width: 380px; padding: 4px 4px 4px 28px; font-size: .78rem; }
+    .gantt-sub-months { flex: 1; display: flex; min-width: 336px; height: 34px; }
+    .gantt-sub-cell { flex: 1; border-left: 1px dashed #eee; }
+    .gantt-sub-months { position: relative; }
+    .gantt-sub-bar { position: absolute; top: 50%; transform: translateY(-50%); height: 14px; border-radius: 3px; opacity: .75; pointer-events: none; }
+    .gantt-month-header { display: flex; }
+    .gantt-header-row { position: sticky; top: 0; z-index: 50; background: #f8f9fa; }
+    .gantt-month-cell { flex: 1; text-align: center; font-size: .72rem;
+      color: #888; padding: 6px 0; border-left: 1px solid #eee; min-width: 28px; }
+
+    /* ── MISC ── */
+    .prog-sm { height: 5px !important; }
+    .cat-badge { font-size: .72rem; padding: 2px 7px; border-radius: 4px; }
+    .tbl { font-size: .875rem; }
+    .tbl th, .tbl td { text-align: center; vertical-align: middle; }
+    .tbl th { font-weight: 600; font-size: .8rem; color: #555; }
+    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .page-header h4 { margin: 0; font-weight: 700; font-size: 1.15rem; }
+    .empty-state { text-align: center; padding: 48px 20px; color: #aaa; }
+    .empty-state i { font-size: 2.5rem; display: block; margin-bottom: 10px; }
+
+    /* ── TABLE-TYPE PERF ── */
+    .table-entry input[type=number] {
+      width: 70px; padding: 2px 4px; font-size: .78rem;
+      border: 1px solid #dee2e6; border-radius: 4px; text-align: right;
+    }
+    .table-entry input[type=number]:focus { outline: none; border-color: var(--accent); }
+    .type-badge-simple { background:#e8f4fd; color:#0d6efd; font-size:.7rem; padding:2px 6px; border-radius:10px; }
+    .type-badge-table  { background:#fff3cd; color:#856404; font-size:.7rem; padding:2px 6px; border-radius:10px; }
+    .month-tab-btns { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:12px; }
+    .month-tab-btn  { border:1px solid #dee2e6; background:#fff; border-radius:6px; padding:3px 10px; font-size:.78rem; cursor:pointer; }
+    .month-tab-btn.has-data { background:#e8f4fd; border-color:#0d6efd; color:#0d6efd; font-weight:600; }
+    .month-tab-btn.selected { background:var(--accent); color:#fff; border-color:var(--accent); }
+    input[type='text'], input:not([type]), textarea { ime-mode: active; }
+    input[lang="ko"], textarea[lang="ko"] { font-family: inherit; }
+    input::placeholder, textarea::placeholder { opacity: 0.5; }
+  /* ── 로그인 ── */
+  #login-overlay {
+    position: fixed; inset: 0; background: linear-gradient(135deg,#1a2340 0%,#2d3f6b 100%);
+    display: flex; align-items: center; justify-content: center; z-index: 9999;
+  }
+  #login-overlay.hidden { display: none; }
+  .login-box {
+    background: #fff; border-radius: 16px; padding: 40px 36px; width: 360px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.35);
+  }
+  .login-box h2 { font-size: 1.3rem; font-weight: 700; margin-bottom: 4px; color: #1a2340; }
+  .login-box .sub { color: #888; font-size: .85rem; margin-bottom: 28px; }
+  .login-error { color: #dc3545; font-size: .82rem; margin-top: 8px; min-height: 18px; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════ LOGIN ══════════ -->
+<div id="login-overlay">
+  <div class="login-box">
+    <h2>🔒 감시사업 관리</h2>
+    <p class="sub">접근하려면 비밀번호를 입력하세요</p>
+    <div class="mb-3">
+      <input type="password" class="form-control" id="login-pw" placeholder="비밀번호"
+        onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="form-check mb-3">
+      <input class="form-check-input" type="checkbox" id="login-keep" checked>
+      <label class="form-check-label small text-muted" for="login-keep">로그인 상태 유지</label>
+    </div>
+    <button class="btn btn-primary w-100" onclick="doLogin()">로그인</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- ══════════ TOPBAR ══════════ -->
+<div class="topbar">
+  <div class="year-badge">
+    <i class="bi bi-calendar3" style="color:var(--accent)"></i>
+    <select id="yearSelect" onchange="changeYear(this.value)"></select>
+    <span class="text-muted" style="font-size:.75rem">년도</span>
+  </div>
+  <button class="btn btn-sm btn-outline-secondary" onclick="exportJSON()" title="데이터 내보내기">
+    <i class="bi bi-download"></i>
+  </button>
+  <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('fileImport').click()" title="데이터 가져오기">
+    <i class="bi bi-upload"></i>
+  </button>
+  <input type="file" id="fileImport" accept=".json" style="display:none" onchange="importJSON(event)">
+</div>
+
+<!-- ══════════ SIDEBAR ══════════ -->
+<div class="sidebar">
+  <div class="sidebar-brand">
+    <i class="bi bi-bar-chart-fill"></i>
+    <span id="brand-name" class="ms-2">사업 관리 시스템</span>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">메인</div>
+    <a href="#" onclick="go('dashboard')" id="nav-dashboard" class="active">
+      <i class="bi bi-grid-1x2"></i> 대시보드
+    </a>
+    <a href="#" onclick="go('schedule')" id="nav-schedule">
+      <i class="bi bi-calendar3"></i> 전체 일정
+    </a>
+    <a href="#" onclick="go('projects')" id="nav-projects">
+      <i class="bi bi-folder2"></i> 사업 목록
+    </a>
+    <div class="sidebar-section">사업별</div>
+    <div id="proj-nav"></div>
+    <div class="sidebar-section">관리</div>
+    <a href="#" onclick="go('settings')" id="nav-settings">
+      <i class="bi bi-gear"></i> 설정
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <a href="#" onclick="exportExcelAll()"><i class="bi bi-file-earmark-excel"></i> 전체 엑셀 내보내기</a>
+    <a href="#" onclick="logout()" style="color:#dc3545;margin-top:4px"><i class="bi bi-box-arrow-right"></i> 로그아웃</a>
+  </div>
+</div>
+
+<!-- ══════════ MAIN ══════════ -->
+<div class="main">
+
+  <!-- ── 대시보드 ── -->
+  <div id="page-dashboard" class="page active">
+    <div id="newyear-banner" style="display:none"></div>
+    <div class="page-header">
+      <h4>📊 전체 사업 현황</h4>
+      <span id="dash-year-label" class="text-muted small"></span>
+    </div>
+    <div class="row g-3 mb-4" id="dash-stats"></div>
+    <div class="card-box mb-3">
+      <div class="fw-semibold mb-3">사업별 예산 현황</div>
+      <div id="dash-table"></div>
+    </div>
+    <div class="card-box">
+      <div class="fw-semibold mb-3">📊 사업별 실적 현황</div>
+      <div id="dash-perf-table"></div>
+    </div>
+  </div>
+
+  <!-- ── 전체 일정 ── -->
+  <div id="page-schedule" class="page">
+    <div class="page-header">
+      <h4>📅 전체 사업 일정</h4>
+    </div>
+    <div class="card-box">
+      <div id="gantt-area"></div>
+    </div>
+  </div>
+
+  <!-- ── 사업 목록 ── -->
+  <div id="page-projects" class="page">
+    <div class="page-header">
+      <h4>📋 사업 목록</h4>
+      <button class="btn btn-primary btn-sm" onclick="openProjectModal()">
+        <i class="bi bi-plus-lg"></i> 사업 추가
+      </button>
+    </div>
+    <div class="row g-3" id="proj-grid"></div>
+  </div>
+
+  <!-- ── 사업 상세 ── -->
+  <div id="page-proj-detail" class="page">
+    <div class="page-header">
+      <div>
+        <a href="#" onclick="go('projects')" class="text-muted text-decoration-none small">
+          <i class="bi bi-arrow-left"></i> 사업 목록
+        </a>
+        <h4 id="detail-title" class="mt-1 mb-0"></h4>
+        <div id="detail-mgr" class="text-muted small mt-1" style="font-size:.82rem"></div>
+        <div id="detail-meta" class="mt-1 d-flex flex-wrap gap-3" style="font-size:.78rem"></div>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-outline-success" onclick="exportProjExcel()">
+          <i class="bi bi-file-earmark-excel"></i> 엑셀
+        </button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="editCurrentProject()">
+          <i class="bi bi-pencil"></i> 수정
+        </button>
+        <button class="btn btn-sm btn-outline-danger" onclick="deleteCurrentProject()">
+          <i class="bi bi-trash"></i>
+        </button>
+      </div>
+    </div>
+    <div class="row g-3 mb-3" id="detail-stats"></div>
+    <div id="detail-perf-summary"></div>
+    <div class="card-box">
+      <div class="border-bottom mb-3">
+        <button class="tab-btn active" onclick="switchTab('perf',this)">실적 관리</button>
+        <button class="tab-btn" onclick="switchTab('perf-crit',this)">실적 기준 설정</button>
+        <button class="tab-btn" onclick="switchTab('budget',this)">예산 사용 내역</button>
+        <button class="tab-btn" onclick="switchTab('budget-cat',this)">예산 항목 설정</button>
+        <button class="tab-btn" onclick="switchTab('budget-amend',this)">추경 관리</button>
+      </div>
+      <div id="tab-perf" class="proj-tab">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <span class="fw-semibold">월별 실적 현황</span>
+          <button class="btn btn-primary btn-sm" onclick="openPerfModal()">
+            <i class="bi bi-plus-lg"></i> 실적 입력
+          </button>
+        </div>
+        <div id="perf-content"></div>
+      </div>
+      <div id="tab-budget" class="proj-tab" style="display:none">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <span class="fw-semibold">지출 내역</span>
+          <div class="d-flex gap-2">
+            <select class="form-select form-select-sm w-auto" id="budget-month-filter" onchange="renderBudgetTab()">
+              <option value="0">전체 월</option>
+              <option value="1">1월</option><option value="2">2월</option><option value="3">3월</option>
+              <option value="4">4월</option><option value="5">5월</option><option value="6">6월</option>
+              <option value="7">7월</option><option value="8">8월</option><option value="9">9월</option>
+              <option value="10">10월</option><option value="11">11월</option><option value="12">12월</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="openExpenseModal()">
+              <i class="bi bi-plus-lg"></i> 지출 입력
+            </button>
+          </div>
+        </div>
+        <div id="budget-content"></div>
+      </div>
+      <div id="tab-budget-cat" class="proj-tab" style="display:none">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div>
+            <span class="fw-semibold">예산 항목 설정</span>
+            <span class="badge bg-primary ms-2" id="budget-cat-year-badge"></span>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" onclick="copyFromPrevYear('budget')" id="btn-copy-budget">
+              <i class="bi bi-arrow-counterclockwise"></i> 이전 연도에서 복사
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="openCatModal()">
+              <i class="bi bi-plus-lg"></i> 예산 과목 추가
+            </button>
+          </div>
+        </div>
+        <div id="budget-cat-content"></div>
+      </div>
+      <div id="tab-budget-amend" class="proj-tab" style="display:none">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <span class="fw-semibold">추경 이력</span>
+          <button class="btn btn-primary btn-sm" onclick="openAmendModal()">
+            <i class="bi bi-plus-lg"></i> 추경 추가
+          </button>
+        </div>
+        <div id="budget-amend-content"></div>
+      </div>
+      <div id="tab-perf-crit" class="proj-tab" style="display:none">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div>
+            <span class="fw-semibold">실적 기준 설정</span>
+            <span class="badge bg-success ms-2" id="perf-crit-year-badge"></span>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" onclick="copyFromPrevYear('criteria')" id="btn-copy-criteria">
+              <i class="bi bi-arrow-counterclockwise"></i> 이전 연도에서 복사
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="openCritModal()">
+              <i class="bi bi-plus-lg"></i> 기준 추가
+            </button>
+          </div>
+        </div>
+        <div id="perf-crit-content"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 설정 ── -->
+  <div id="page-settings" class="page">
+    <div class="page-header"><h4>⚙️ 설정</h4></div>
+    <div class="card-box mb-4">
+      <div class="fw-semibold mb-3">기본 설정</div>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label small">기관/단체명</label>
+          <input class="form-control" lang="ko" id="s-org" placeholder="기관명">
+        </div>
+      </div>
+      <button class="btn btn-primary btn-sm mt-3" onclick="saveSettings()">저장</button>
+    </div>
+    <div class="card-box mb-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <span class="fw-semibold">팀원 관리</span>
+        <button class="btn btn-primary btn-sm" onclick="openMemberForm()">
+          <i class="bi bi-plus-lg"></i> 팀원 추가
+        </button>
+      </div>
+      <div id="s-member-list" class="mb-2"></div>
+      <div id="s-member-form" style="display:none" class="mt-2 p-3 bg-light rounded">
+        <div class="row g-2 align-items-end">
+          <input type="hidden" id="s-member-id">
+          <div class="col-auto">
+            <label class="form-label small mb-1">이름</label>
+            <input class="form-control form-control-sm" lang="ko" id="s-member-name" placeholder="홍길동" style="width:140px">
+          </div>
+          <div class="col-auto">
+            <button class="btn btn-primary btn-sm" onclick="saveMember()">저장</button>
+            <button class="btn btn-secondary btn-sm ms-1" onclick="closeMemberForm()">취소</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-box mb-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <span class="fw-semibold">사업 목록</span>
+        <button class="btn btn-primary btn-sm" onclick="openProjectModal()">
+          <i class="bi bi-plus-lg"></i> 사업 추가
+        </button>
+      </div>
+      <div id="s-proj-list"></div>
+    </div>
+    <div class="card-box mb-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <span class="fw-semibold">연도 관리</span>
+        <button class="btn btn-primary btn-sm" onclick="openAddYearForm()">
+          <i class="bi bi-plus-lg"></i> 연도 추가
+        </button>
+      </div>
+      <div id="s-year-list"></div>
+      <div id="s-year-form" style="display:none" class="mt-3 p-3 bg-light rounded">
+        <div class="row g-2 align-items-end">
+          <div class="col-auto">
+            <label class="form-label small mb-1">추가할 연도</label>
+            <input type="number" class="form-control form-control-sm" id="s-new-year" placeholder="예: 2027" style="width:110px">
+          </div>
+          <div class="col-auto">
+            <label class="form-label small mb-1">이전 연도 항목 복사</label>
+            <select class="form-select form-select-sm" id="s-copy-from" style="width:130px">
+              <option value="">복사 안 함</option>
+            </select>
+          </div>
+          <div class="col-auto">
+            <button class="btn btn-primary btn-sm" onclick="addYear()">추가</button>
+            <button class="btn btn-secondary btn-sm ms-1" onclick="closeAddYearForm()">취소</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-box mb-4">
+      <div class="fw-semibold mb-3">🔒 비밀번호 변경</div>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label small">현재 비밀번호</label>
+          <input type="password" class="form-control" id="s-pw-cur" placeholder="현재 비밀번호">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small">새 비밀번호</label>
+          <input type="password" class="form-control" id="s-pw-new" placeholder="새 비밀번호">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small">새 비밀번호 확인</label>
+          <input type="password" class="form-control" id="s-pw-confirm" placeholder="새 비밀번호 확인">
+        </div>
+      </div>
+      <div class="d-flex align-items-center gap-3 mt-3">
+        <button class="btn btn-primary btn-sm" onclick="changePw()">비밀번호 변경</button>
+        <span id="s-pw-msg" class="small"></span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════ MODALS ══════════ -->
+
+<!-- 새해 설정 모달 -->
+<div class="modal fade" id="mNewYear" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff">
+        <h5 class="modal-title">🎉 새해가 되었습니다!</h5>
+      </div>
+      <div class="modal-body">
+        <p><strong id="newYearNum"></strong>년도 데이터를 시작합니다.</p>
+        <p class="text-muted small">이전 연도(<span id="prevYearNum"></span>년)의 예산 항목과 실적 기준을 복사해서 시작할 수 있어요. 복사 후에 금액이나 기준을 수정할 수 있습니다.</p>
+        <div class="alert alert-info small mb-0">
+          <i class="bi bi-info-circle"></i>
+          이전 연도 데이터는 그대로 보존됩니다. 상단 연도 선택기로 언제든 과거 데이터를 볼 수 있어요.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="startNewYear(false)">새로 시작하기</button>
+        <button class="btn btn-primary" onclick="startNewYear(true)">이전 연도 항목 복사해서 시작</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 사업 추가/수정 -->
+<div class="modal fade" id="mProject" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="mProjTitle">사업 추가</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="p-id">
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label small">사업명 *</label>
+            <input class="form-control" lang="ko" id="p-name" placeholder="사업명">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">주 담당자</label>
+            <select class="form-select" id="p-main-mgr-sel" onchange="onMgrSelChange('p-main-mgr')">
+              <option value="">선택</option>
+              <option value="__custom__">직접 입력</option>
+            </select>
+            <input class="form-control mt-1" lang="ko" id="p-main-mgr-txt" placeholder="직접 입력" style="display:none">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">부 담당자</label>
+            <select class="form-select" id="p-sub-mgr-sel" onchange="onMgrSelChange('p-sub-mgr')">
+              <option value="">선택</option>
+              <option value="__custom__">직접 입력</option>
+            </select>
+            <input class="form-control mt-1" lang="ko" id="p-sub-mgr-txt" placeholder="직접 입력" style="display:none">
+          </div>
+          <div class="col-md-5">
+            <label class="form-label small">문서번호</label>
+            <input class="form-control" lang="ko" id="p-docnum" placeholder="예: 2026-23(2026. 1. 31.)">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">시작일</label>
+            <input class="form-control" type="date" id="p-start">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">종료일</label>
+            <input class="form-control" type="date" id="p-end">
+          </div>
+          <div class="col-md-1">
+            <label class="form-label small">색상</label>
+            <input class="form-control form-control-color w-100" type="color" id="p-color" value="#4f6ef7">
+          </div>
+          <div class="col-12">
+            <label class="form-label small d-flex justify-content-between align-items-center">
+              <span>예산 과목</span>
+              <span id="p-budget-total" class="text-primary fw-semibold"></span>
+            </label>
+            <div id="p-budget-items">
+              <!-- 동적으로 추가됨 -->
+            </div>
+            <button type="button" class="btn btn-outline-secondary btn-sm mt-2" onclick="addBudgetItem()">
+              <i class="bi bi-plus-lg"></i> 과목 추가
+            </button>
+          </div>
+          <div class="col-12">
+            <label class="form-label small">사업 설명</label>
+            <textarea class="form-control" lang="ko" id="p-desc" rows="2" placeholder="간략한 사업 설명"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+        <button class="btn btn-primary" onclick="saveProject()">저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 지출 입력 -->
+<div class="modal fade" id="mExpense" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">지출 입력</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="e-id">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label small">날짜 *</label>
+            <input class="form-control" type="date" id="e-date">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">금액 (원) *</label>
+            <input class="form-control" type="number" id="e-amount" placeholder="0">
+          </div>
+          <div class="col-12">
+            <label class="form-label small">내용 *</label>
+            <input class="form-control" lang="ko" id="e-desc" placeholder="지출 내용">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">대상/업체</label>
+            <input class="form-control" lang="ko" id="e-target" placeholder="업체명 등">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">예산 과목</label>
+            <select class="form-select" id="e-cat" onchange="onExpCatChange()">
+              <option value="">선택</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">예산 항목</label>
+            <select class="form-select" id="e-item">
+              <option value="">선택</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">담당자</label>
+            <select class="form-select" id="e-mgr-sel" onchange="onMgrSelChange('e-mgr')">
+              <option value="">선택</option>
+              <option value="__custom__">직접 입력</option>
+            </select>
+            <input class="form-control mt-1" lang="ko" id="e-mgr-txt" placeholder="직접 입력" style="display:none">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">비고</label>
+            <input class="form-control" lang="ko" id="e-note" placeholder="비고">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+        <button class="btn btn-primary" onclick="saveExpense()">저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 추경 입력 모달 -->
+<div class="modal fade" id="mAmend" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="mAmendTitle">추경 추가</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="amend-id">
+        <input type="hidden" id="amend-item-id">
+        <div class="mb-3">
+          <label class="form-label small">예산 과목 *</label>
+          <select class="form-select" id="amend-cat" onchange="onAmendCatChange()">
+            <option value="">— 선택 —</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small">일자 *</label>
+          <input class="form-control" type="date" id="amend-date">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small">기존 예산 (원)</label>
+          <input class="form-control" type="number" id="amend-prev" placeholder="0" readonly
+            style="background:#f8f9fa;color:#888">
+        </div>
+        <div>
+          <label class="form-label small">수정 예산 (원) *</label>
+          <input class="form-control" type="number" id="amend-new" placeholder="0"
+            oninput="updateAmendDiff()">
+          <div id="amend-diff" class="mt-1" style="font-size:.8rem;min-height:18px"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+        <button class="btn btn-primary" onclick="saveAmend()">저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 예산 항목 -->
+<div class="modal fade" id="mCat" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="mCatTitle">예산 과목 추가</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="c-id">
+        <div class="mb-3">
+          <label class="form-label small">항목명 *</label>
+          <input class="form-control" lang="ko" id="c-name" placeholder="예: (세목)성매매성착취대응사업">
+        </div>
+        <div>
+          <label class="form-label small">배정 예산 (원)</label>
+          <input class="form-control" type="number" id="c-budget" placeholder="0">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+        <button class="btn btn-primary" onclick="saveCat()">저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- 예산 항목(세부) -->
+<div class="modal fade" id="mItem" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="mItemTitle">예산 항목 추가</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="it-cat-id">
+        <input type="hidden" id="it-id">
+        <div class="mb-3">
+          <label class="form-label small">항목명 *</label>
+          <input class="form-control" lang="ko" id="it-name" placeholder="예: DB관리, 모니터링">
+        </div>
+        <div class="mb-0">
+          <label class="form-label small">배정 예산 (원)</label>
+          <input class="form-control" type="number" id="it-budget" placeholder="0">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+        <button class="btn btn-primary" onclick="saveItem()">저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 실적 기준 -->
+<div class="modal fade" id="mCrit" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="mCritTitle">실적 기준 추가</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="cr-id">
+        <div id="cr-items-container"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-primary btn-sm me-auto" id="cr-add-item-btn" onclick="addCritItem()">
+          <i class="bi bi-plus-lg"></i> 기준 추가
+        </button>
+        <button class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+        <button class="btn btn-primary" onclick="saveCrit()">저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 실적 입력 -->
+<div class="modal fade" id="mPerf" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">실적 입력</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="pf-id">
+        <div class="row g-3 mb-3">
+          <div class="col-md-2">
+            <label class="form-label small">월 *</label>
+            <select class="form-select" id="pf-month" onchange="onPerfCritChange()"></select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">실적 기준 *</label>
+            <select class="form-select" id="pf-crit" onchange="onPerfCritChange()"></select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">담당자</label>
+            <select class="form-select" id="pf-mgr-sel" onchange="onMgrSelChange('pf-mgr')">
+              <option value="">선택</option>
+              <option value="__custom__">직접 입력</option>
+            </select>
+            <input class="form-control mt-1" lang="ko" id="pf-mgr-txt" placeholder="직접 입력" style="display:none">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small">비고</label>
+            <input class="form-control" lang="ko" id="pf-note" placeholder="비고">
+          </div>
+        </div>
+        <!-- 단순형 입력 -->
+        <div id="pf-simple-area">
+          <label class="form-label small">실적 값 *</label>
+          <input class="form-control" type="number" id="pf-val" placeholder="0" style="max-width:180px">
+        </div>
+        <!-- 테이블형 입력 -->
+        <div id="pf-table-area" style="display:none">
+          <div class="fw-semibold small mb-2 text-primary">
+            <i class="bi bi-table"></i> 각 셀에 숫자를 입력하세요 (빈 칸은 0)
+          </div>
+          <div class="table-responsive">
+            <div id="pf-table-grid"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+        <button class="btn btn-primary" onclick="savePerf()">저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- 세부 내용 추가/수정 -->
+<div class="modal fade" id="mSchedSub" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="mSchedSubTitle">세부 내용 추가</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="ss-item-id">
+        <input type="hidden" id="ss-id">
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">세부 내용 *</label>
+          <input class="form-control" lang="ko" id="ss-label" placeholder="예: 모니터링 및 신고, 운영 결과보고서 작성">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">담당자</label>
+          <select class="form-select" id="ss-assignee-sel" onchange="onMgrSelChange('ss-assignee')">
+            <option value="">선택</option>
+            <option value="__custom__">직접 입력</option>
+          </select>
+          <input class="form-control mt-1" lang="ko" id="ss-assignee-txt" placeholder="직접 입력" style="display:none">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">목표 실적 / 비고</label>
+          <input class="form-control" lang="ko" id="ss-note" placeholder="예: 60만건, 2회, 상시">
+        </div>
+        <div>
+          <label class="form-label small fw-semibold">해당 월 선택</label>
+          <div class="d-flex flex-wrap gap-3 mt-1">
+              <label class="d-flex align-items-center gap-1" style="cursor:pointer"><input type="checkbox" class="sub-mo-chk" value="1"> 1월</label>
+              <label class="d-flex align-items-center gap-1" style="cursor:pointer"><input type="checkbox" class="sub-mo-chk" value="2"> 2월</label>
+              <label class="d-flex align-items-center gap-1" style="cursor:pointer"><input type="checkbox" class="sub-mo-chk" value="3"> 3월</label>
+              <label class="d-flex align-items-center gap-1" style="cursor:pointer"><input type="checkbox" class="sub-mo-chk" value="4"> 4월</label>
+              <label class="d-flex align-items-center gap-1" style="cursor:pointer"><input type="checkbox" class="sub-mo-chk" value="5"> 5월</label>
+              <label class="d-flex align-items-center gap-1" style="cursor:pointer"><input type="checkbox" class="sub-mo-chk" value="6"> 6월</label>
+              <label class="d-flex align-items-center gap-1" style="cursor:pointer"><input type="checkbox" class="sub-mo-chk" value="7"> 7월</label>
+              <label class="d-flex align-items-center gap-1" style="cursor:pointer"><input type="checkbox" class="sub-mo-chk" value="8"> 8월</label>
+              <label class="d-flex align-items-center gap-1" style="cursor:pointer"><input type="checkbox" class="sub-mo-chk" value="9"> 9월</label>
+              <label class="d-flex align-items-center gap-1" style="cursor:pointer"><input type="checkbox" class="sub-mo-chk" value="10"> 10월</label>
+              <label class="d-flex align-items-center gap-1" style="cursor:pointer"><input type="checkbox" class="sub-mo-chk" value="11"> 11월</label>
+              <label class="d-flex align-items-center gap-1" style="cursor:pointer"><input type="checkbox" class="sub-mo-chk" value="12"> 12월</label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+        <button class="btn btn-primary" onclick="saveSubItem()">저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 일정 항목 추가/수정 -->
+<div class="modal fade" id="mSchedItem" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="mSchedItemTitle">일정 항목 추가</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="si-id">
+        <input type="hidden" id="si-proj-id">
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">항목명 *</label>
+          <input class="form-control" lang="ko" id="si-label" placeholder="예: 토론회 준비">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">담당자</label>
+          <select class="form-select" id="si-assignee-sel" onchange="onMgrSelChange('si-assignee')">
+            <option value="">선택</option>
+            <option value="__custom__">직접 입력</option>
+          </select>
+          <input class="form-control mt-1" lang="ko" id="si-assignee-txt" placeholder="직접 입력" style="display:none">
+        </div>
+        <div class="row g-3">
+          <div class="col-6">
+            <label class="form-label small fw-semibold">시작 월</label>
+            <select class="form-select" id="si-start">
+              <option value="">없음</option>
+              <option value="1">1월</option><option value="2">2월</option><option value="3">3월</option>
+              <option value="4">4월</option><option value="5">5월</option><option value="6">6월</option>
+              <option value="7">7월</option><option value="8">8월</option><option value="9">9월</option>
+              <option value="10">10월</option><option value="11">11월</option><option value="12">12월</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label small fw-semibold">종료 월</label>
+            <select class="form-select" id="si-end">
+              <option value="">없음</option>
+              <option value="1">1월</option><option value="2">2월</option><option value="3">3월</option>
+              <option value="4">4월</option><option value="5">5월</option><option value="6">6월</option>
+              <option value="7">7월</option><option value="8">8월</option><option value="9">9월</option>
+              <option value="10">10월</option><option value="11">11월</option><option value="12">12월</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+        <button class="btn btn-primary" onclick="saveSchedItem()">저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  DATA LAYER
+//  프로젝트 구조:
+//  project.yearData[year] = { totalBudget, budgetCategories, performanceCriteria }
+//  project.expenses[]  → 날짜에서 year 자동 계산
+//  project.performanceRecords[] → year 필드 명시
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const KEY = 'biz_mgmt_v2';
+const THIS_YEAR = new Date().getFullYear();
+let D = loadData();
+let curProjId = null;
+let dashChartInst = null;
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Supabase 연결
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const SUPA_URL   = 'https://bpamvabdgkoueulczkqk.supabase.co';
+const SUPA_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwYW12YWJkZ2tvdWV1bGN6a3FrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MzI3MzksImV4cCI6MjA5MzEwODczOX0.iVTaZfWvvTPNBvWaNVLm0-EM0gYmMfH4ixxmV94obkU';
+const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  로그인 (비밀번호 해시 방식)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const DEFAULT_HASH = '46b4a9285ba317970f3436eeb6b5a130cf5524a8c00e1152ac11ba44c93b7ec9';
+const PW_HASH_KEY  = 'gamsi_pw_hash';
+function getPwHash() { return localStorage.getItem(PW_HASH_KEY) || DEFAULT_HASH; }
+const SESSION_KEY  = 'gamsi_auth';
+
+async function hashStr(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function doLogin() {
+  const pw    = document.getElementById('login-pw').value;
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  if (!pw) { errEl.textContent = '비밀번호를 입력하세요.'; return; }
+  const h = await hashStr(pw);
+  if (h === getPwHash()) {
+    const keep = document.getElementById('login-keep')?.checked !== false;
+    if (keep) localStorage.setItem(SESSION_KEY, '1');
+    else sessionStorage.setItem(SESSION_KEY, '1');
+    document.getElementById('login-overlay').classList.add('hidden');
+    await initApp();
+  } else {
+    errEl.textContent = '비밀번호가 올바르지 않습니다.';
+    document.getElementById('login-pw').value = '';
+    document.getElementById('login-pw').focus();
+  }
+}
+
+function checkAuth() {
+  if (localStorage.getItem(SESSION_KEY) === '1' || sessionStorage.getItem(SESSION_KEY) === '1') {
+    document.getElementById('login-overlay').classList.add('hidden');
+    return true;
+  }
+  document.getElementById('login-pw').focus();
+  return false;
+}
+
+function uid() { return 'id' + Date.now() + Math.random().toString(36).slice(2,7); }
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+async function loadData() {
+  try {
+    const { data, error } = await sb.from('app_state').select('data').eq('id', 1).single();
+    if (!error && data?.data) return data.data;
+  } catch(e) {
+    console.error('Supabase 불러오기 실패, 기본값 사용:', e);
+  }
+  return makeDefault();
+}
+function makeDefault() {
+  return { settings: { org: '사업 관리 시스템', activeYear: THIS_YEAR, members: [] }, projects: [], schedule: {} };
+}
+function save() {
+  localStorage.setItem(KEY, JSON.stringify(D));  // 로컬 백업
+  sb.from('app_state')
+    .upsert({ id: 1, data: D, updated_at: new Date().toISOString() })
+    .then(({ error }) => { if (error) console.error('Supabase 저장 오류:', error); });
+}
+
+// ── 연도별 프로젝트 설정 접근 ──
+function getYearData(p, year) {
+  if (!p.yearData) p.yearData = {};
+  const y = year || D.settings.activeYear;
+  if (!p.yearData[y]) p.yearData[y] = { totalBudget: 0, budgetCategories: [], performanceCriteria: [] };
+  return p.yearData[y];
+}
+
+// ── 현재 연도의 지출 필터 ──
+function yearExpenses(p, year) {
+  const y = year || D.settings.activeYear;
+  return (p.expenses || []).filter(e => e.year === y);
+}
+function yearPerfRecs(p, year) {
+  const y = year || D.settings.activeYear;
+  return (p.performanceRecords || []).filter(r => r.year === y);
+}
+function totalExpenses(p, year) {
+  return yearExpenses(p, year).reduce((s, e) => s + (e.amount || 0), 0);
+}
+function getProj(id) { return D.projects.find(p => p.id === (id || curProjId)); }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  연도 관리
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function buildYearSelector() {
+  const sel = document.getElementById('yearSelect');
+  const active = D.settings.activeYear;
+  // D.settings.years 없으면 현재 연도로 초기화
+  if (!D.settings.years || !D.settings.years.length) {
+    D.settings.years = [active || THIS_YEAR];
+  }
+  const years = [...new Set(D.settings.years)].sort((a,b) => a-b);
+  sel.innerHTML = years.map(y =>
+    `<option value="${y}" ${y === active ? 'selected' : ''}>${y}</option>`
+  ).join('');
+}
+
+function changeYear(yr) {
+  D.settings.activeYear = parseInt(yr);
+  save();
+  // 현재 보고 있는 페이지 새로 그리기
+  const activePage = document.querySelector('.page.active');
+  if (!activePage) return;
+  const id = activePage.id.replace('page-', '');
+  if (id === 'dashboard')   renderDashboard();
+  if (id === 'schedule')    renderSchedule();
+  if (id === 'projects')    renderProjects();
+  if (id === 'proj-detail') renderDetail();
+}
+
+// 새해 감지 → 모달
+function checkNewYear() {
+  const active = D.settings.activeYear;
+  if (THIS_YEAR > active) {
+    document.getElementById('newYearNum').textContent = THIS_YEAR;
+    document.getElementById('prevYearNum').textContent = active;
+    new bootstrap.Modal(document.getElementById('mNewYear')).show();
+  }
+}
+
+function startNewYear(copyPrev) {
+  const prevYear = D.settings.activeYear;
+  const newYear  = THIS_YEAR;
+  if (copyPrev) {
+    D.projects.forEach(p => {
+      const prev = p.yearData?.[prevYear];
+      if (prev) {
+        const newYD = getYearData(p, newYear);
+        // 항목 이름·구조만 복사, 금액은 그대로 (담당자가 수정 예정)
+        newYD.budgetCategories = (prev.budgetCategories || []).map(c =>
+          ({ id: uid(), name: c.name, budget: c.budget, isMainBudget: c.isMainBudget }));
+        newYD.performanceCriteria = (prev.performanceCriteria || []).map(c =>
+          ({ id: uid(), name: c.name, unit: c.unit, target: c.target }));
+        newYD.totalBudget = prev.totalBudget;
+      }
+    });
+  }
+  D.settings.activeYear = newYear;
+  save();
+  buildYearSelector();
+  bootstrap.Modal.getInstance(document.getElementById('mNewYear')).hide();
+  renderDashboard();
+  if (copyPrev) alert(`${newYear}년도 항목을 복사했습니다!\n각 사업의 "예산 항목 설정" 탭에서 금액을 수정해주세요.`);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  NAVIGATION
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function go(page, projId) {
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.sidebar-nav a').forEach(a => a.classList.remove('active'));
+  const pageEl = document.getElementById('page-' + page);
+  if (pageEl) pageEl.classList.add('active');
+  const navEl = document.getElementById('nav-' + page);
+  if (navEl) navEl.classList.add('active');
+  if (page === 'dashboard')    renderDashboard();
+  if (page === 'schedule')     renderSchedule();
+  if (page === 'projects')     renderProjects();
+  if (page === 'proj-detail')  { curProjId = projId; document.getElementById('nav-proj-' + projId)?.classList.add('active'); renderDetail(); }
+  if (page === 'settings')     renderSettings();
+  return false;
+}
+
+function rebuildProjNav() {
+  document.getElementById('proj-nav').innerHTML =
+    D.projects.map(p => `
+      <a href="#" onclick="go('proj-detail','${p.id}')" id="nav-proj-${p.id}">
+        <span class="proj-dot" style="background:${p.color||'#4f6ef7'}"></span>
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span>
+      </a>`).join('');
+}
+
+// 이전 연도에서 복사
+function copyFromPrevYear(type) {
+  const p = getProj(); if (!p) return;
+  const y = D.settings.activeYear;
+  const prevY = y - 1;
+  const prev = p.yearData?.[prevY];
+  if (!prev) { alert(`${prevY}년도 데이터가 없습니다.`); return; }
+  const yd = getYearData(p, y);
+  if (type === 'budget') {
+    if (!prev.budgetCategories?.length) { alert(`${prevY}년도 예산 항목이 없습니다.`); return; }
+    if (!confirm(`${prevY}년 예산 항목을 ${y}년으로 복사하시겠습니까?\n기존 항목은 유지되고 추가됩니다.`)) return;
+    prev.budgetCategories.forEach(c => yd.budgetCategories.push({ id: uid(), name: c.name, budget: c.budget }));
+  } else {
+    if (!prev.performanceCriteria?.length) { alert(`${prevY}년도 실적 기준이 없습니다.`); return; }
+    if (!confirm(`${prevY}년 실적 기준을 ${y}년으로 복사하시겠습니까?`)) return;
+    prev.performanceCriteria.forEach(c => yd.performanceCriteria.push({ id: uid(), name: c.name, unit: c.unit, target: c.target }));
+  }
+  save(); renderDetail();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  DASHBOARD
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function renderDashboard() {
+  const y = D.settings.activeYear;
+  document.getElementById('dash-year-label').textContent = y + '년도';
+
+  // 새해 배너
+  const banner = document.getElementById('newyear-banner');
+  if (THIS_YEAR > y) {
+    banner.style.display = 'block';
+    banner.innerHTML = `<div class="newyear-banner">
+      <div>
+        <div class="fw-bold">📅 현재 ${THIS_YEAR}년도 데이터를 보고 있지 않습니다</div>
+        <div class="small opacity-75">상단 연도 선택기에서 ${THIS_YEAR}년을 선택하면 최신 데이터를 볼 수 있어요.</div>
+      </div>
+      <button class="btn btn-light btn-sm" onclick="changeYear(${THIS_YEAR});document.getElementById('yearSelect').value=${THIS_YEAR}">
+        ${THIS_YEAR}년으로 전환
+      </button>
+    </div>`;
+  } else { banner.style.display = 'none'; }
+
+  const ps = D.projects;
+  const totBudget = ps.reduce((s, p) => s + (getYearData(p, y).totalBudget || 0), 0);
+  const totUsed   = ps.reduce((s, p) => s + totalExpenses(p, y), 0);
+  const totLeft   = totBudget - totUsed;
+  const rate      = totBudget > 0 ? ((totUsed / totBudget) * 100).toFixed(1) : 0;
+
+  document.getElementById('dash-stats').innerHTML = `
+    <div class="col-6 col-md-3"><div class="stat-box" style="min-height:90px;display:flex;flex-direction:column;justify-content:center;">
+      <div class="text-muted small">전체 사업 수</div>
+      <div class="d-flex align-items-baseline gap-2">
+        <span class="fw-bold fs-2 text-primary">${ps.length}</span>
+        <span class="text-muted small">개 사업</span>
+      </div>
+    </div></div>
+    <div class="col-6 col-md-3"><div class="stat-box" style="min-height:90px;display:flex;flex-direction:column;justify-content:center;">
+      <div class="text-muted small">총 예산 (${y})</div>
+      <div class="fw-bold fs-5">₩${fmt(totBudget)}</div>
+    </div></div>
+    <div class="col-6 col-md-3"><div class="stat-box" style="min-height:90px;display:flex;flex-direction:column;justify-content:center;">
+      <div class="text-muted small">총 사용액</div>
+      <div class="d-flex align-items-baseline gap-2">
+        <span class="fw-bold fs-5 text-danger">₩${fmt(totUsed)}</span>
+        <span class="text-muted small">사용률 ${rate}%</span>
+      </div>
+    </div></div>
+    <div class="col-6 col-md-3"><div class="stat-box" style="min-height:90px;display:flex;flex-direction:column;justify-content:center;">
+      <div class="text-muted small">잔액</div>
+      <div class="fw-bold fs-5 text-success">₩${fmt(totLeft)}</div>
+    </div></div>`;
+
+  if (!ps.length) {
+    document.getElementById('dash-table').innerHTML =
+      '<div class="empty-state"><i class="bi bi-folder2-open"></i>등록된 사업이 없습니다.</div>';
+  } else {
+    document.getElementById('dash-table').innerHTML = `
+      <div class="table-responsive">
+      <table class="table tbl table-hover align-middle" style="font-size:.88rem">
+        <thead class="table-light">
+          <tr>
+            <th style="min-width:180px">사업명</th>
+            <th style="white-space:nowrap">주/부 담당자</th>
+            <th class="text-end">배정 예산</th>
+            <th class="text-end">사용액</th>
+            <th class="text-end">잔액</th>
+            <th style="width:120px">사용률</th>
+          </tr>
+        </thead><tbody>
+          ${ps.map(p => {
+            const yd = getYearData(p, y);
+            const cats = yd.budgetCategories || [];
+  const used = totalExpenses(p, y);
+            const left = (yd.totalBudget || 0) - used;
+            const r = yd.totalBudget > 0 ? ((used / yd.totalBudget) * 100).toFixed(1) : 0;
+            const bc = r > 90 ? 'bg-danger' : r > 70 ? 'bg-warning' : 'bg-success';
+            const catExpMap = {};
+            yearExpenses(p, y).forEach(e => { catExpMap[e.catId] = (catExpMap[e.catId]||0) + e.amount; });
+            const projRow = `<tr style="cursor:pointer;background:#f8f9ff" onclick="go('proj-detail','${p.id}')">
+              <td><span class="proj-dot" style="background:${p.color||'#4f6ef7'}"></span><strong>${p.name}</strong></td>
+              <td style="white-space:nowrap">${projMgrDisplay(p) || '-'}</td>
+              <td class="text-end fw-semibold">₩${fmt(yd.totalBudget || 0)}</td>
+              <td class="text-end text-danger">₩${fmt(used)}</td>
+              <td class="text-end text-success">₩${fmt(left)}</td>
+              <td><div class="d-flex align-items-center gap-1">
+                <div class="progress flex-grow-1 prog-sm"><div class="progress-bar ${bc}" style="width:${Math.min(r,100)}%"></div></div>
+                <small>${r}%</small>
+              </div></td>
+            </tr>`;
+            const catRows = cats.map(c => {
+              const cUsed = catExpMap[c.id] || 0;
+              const cLeft = (c.budget||0) - cUsed;
+              const cr = c.budget > 0 ? ((cUsed/c.budget)*100).toFixed(1) : 0;
+              const cb = cr > 90 ? 'bg-danger' : cr > 70 ? 'bg-warning' : 'bg-success';
+              return `<tr class="table-light" style="font-size:.78rem">
+                <td colspan="2" class="ps-4 text-muted text-start" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:0">
+                  <i class="bi bi-dash"></i> ${shortCatName(c.name)}
+                </td>
+                <td class="text-end">₩${fmt(c.budget||0)}</td>
+                <td class="text-end text-danger">₩${fmt(cUsed)}</td>
+                <td class="text-end text-success">₩${fmt(cLeft)}</td>
+                <td><div class="d-flex align-items-center gap-1">
+                  <div class="progress flex-grow-1 prog-sm"><div class="progress-bar ${cb}" style="width:${Math.min(cr,100)}%"></div></div>
+                  <small>${cr}%</small>
+                </div></td>
+              </tr>`;
+            }).join('');
+            return projRow + catRows;
+          }).join('')}
+        </tbody>
+      </table></div>`;
+  }
+
+  renderDashPerfTable(y);
+}
+
+function renderDashPerfTable(y) {
+  const el = document.getElementById('dash-perf-table');
+  if (!el) return;
+  const mos = [1,2,3,4,5,6,7,8,9,10,11,12];
+
+  const hasAny = D.projects.some(p => (getYearData(p, y).performanceCriteria || []).length > 0);
+  if (!hasAny) {
+    el.innerHTML = '<p class="text-muted small">등록된 실적 기준이 없습니다.</p>';
+    return;
+  }
+
+  // 사업별 섹션으로 분리
+  let html = '';
+  D.projects.forEach(p => {
+    const yd = getYearData(p, y);
+    const crits = yd.performanceCriteria || [];
+    if (!crits.length) return;
+    const recs = yearPerfRecs(p, y);
+
+    let rows = '';
+    crits.forEach(c => {
+      const colDefsY = c.cols || [];
+      const inColsY  = inputCols(colDefsY);
+      const monthVals = {}, monthDisp = {}, monthNums = {};
+      let hasTextEver = false;
+      mos.forEach(m => {
+        if (c.type === 'table') {
+          const r2 = recs.find(r => r.critId === c.id && r.month === m);
+          const td2 = r2?.tableData || {};
+          let numSum = 0, nums = [], hasText = false;
+          (c.rows||[]).forEach(row => {
+            const rd = computeRowData(colDefsY, td2[row]||{});
+            inColsY.forEach(col => {
+              const v = rd[col];
+              if (v !== undefined && v !== '' && v !== null) {
+                const n = parseFloat(v);
+                if (isNaN(n)) hasText = true;
+                else { numSum += n; nums.push(n); }
+              }
+            });
+          });
+          monthVals[m] = numSum;
+          monthNums[m] = nums;
+          if (hasText) hasTextEver = true;
+          monthDisp[m] = hasText ? (nums.length > 0 ? nums.map(n=>n.toLocaleString('ko-KR')).join('/') : '') : (numSum ? numSum.toLocaleString('ko-KR') : '');
+        } else {
+          const v = recs.filter(r => r.critId === c.id && r.month === m).reduce((s, r) => s + (r.val||0), 0);
+          monthVals[m] = v; monthDisp[m] = v ? fmtNum(v) : '';
+        }
+      });
+      const annTotal = Object.values(monthVals).reduce((s, v) => s + v, 0);
+      const monthsWithData = Object.values(monthVals).filter(v => v > 0).length;
+      const isAvg = c.aggr === 'avg';
+      const annVal = (isAvg && monthsWithData > 0) ? annTotal / monthsWithData : annTotal;
+      // 위치별 합계: 텍스트 혼재 시 "합1/합2" 형식
+      let annDisp;
+      if (hasTextEver) {
+        const maxLen = Math.max(0, ...Object.values(monthNums).map(a => a.length));
+        const posSums = Array.from({length: maxLen}, (_, i) =>
+          Object.values(monthNums).reduce((s, arr) => s + (arr[i] || 0), 0));
+        const posVals = isAvg && monthsWithData > 0 ? posSums.map(v => v / monthsWithData) : posSums;
+        annDisp = posVals.length > 0 ? posVals.map(n=>n.toLocaleString('ko-KR', {maximumFractionDigits:1})).join('/') : '—';
+      } else {
+        annDisp = annVal ? annVal.toLocaleString('ko-KR', {maximumFractionDigits:1}) : '—';
+      }
+      const ar = c.target > 0 ? ((annVal / c.target) * 100).toFixed(1) : '-';
+      const bdg = ar === '-' ? 'bg-secondary' : parseFloat(ar) >= 100 ? 'bg-success' : parseFloat(ar) >= 50 ? 'bg-warning text-dark' : 'bg-secondary';
+      const typeTag = '';
+
+      // ── 행별 분리 모드 ──
+      if (c.type === 'table' && c.dashMode === 'split' && (c.rows||[]).length > 0) {
+        const colDefsD = c.cols || [];
+        const inColsD  = inputCols(colDefsD);
+        const cRows = c.rows || [];
+        cRows.forEach((rowLabel, ri) => {
+          const rowMonthVals = {};
+          mos.forEach(m => {
+            const r2 = recs.find(r => r.critId === c.id && r.month === m);
+            const td2 = r2?.tableData || {};
+            const rd = computeRowData(colDefsD, td2[rowLabel]||{});
+            rowMonthVals[m] = inColsD.reduce((s, col) => s + (parseFloat(rd[col])||0), 0);
+          });
+          const rowAnnTotal = Object.values(rowMonthVals).reduce((s, v) => s + v, 0);
+          const rowAnnDisp  = rowAnnTotal ? rowAnnTotal.toLocaleString('ko-KR') : '—';
+          // 기준명 셀 안에 행 레이블 포함 (열 수 변경 없음)
+
+          const nameCell_r = ri === 0
+            ? `<td class="fw-semibold" rowspan="${cRows.length}" style="vertical-align:middle">${c.name}${typeTag}</td>` : '';
+          const achCells = ri === 0
+            ? `<td class="text-center" rowspan="${cRows.length}" style="vertical-align:middle">${c.target > 0 ? fmtNum(c.target) : '—'}</td>
+               <td class="text-center" rowspan="${cRows.length}" style="vertical-align:middle"><span class="badge ${bdg}">${ar}${ar !== '-' ? '%' : ''}</span></td>` : '';
+          rows += `<tr class="${ri > 0 ? 'split-sub-row' : ''}">
+            ${nameCell_r}<td class="text-muted small" style="white-space:nowrap">${rowLabel}</td>
+            ${mos.map(m => {
+              const v = rowMonthVals[m];
+              const d = v ? v.toLocaleString('ko-KR') : '';
+              return `<td class="text-center ${d ? 'fw-semibold' : 'text-muted'}" style="font-size:.78rem">${d || '—'}</td>`;
+            }).join('')}
+            <td class="text-center fw-bold">${rowAnnDisp}</td>
+            ${achCells}
+          </tr>`;
+        });
+      } else if (c.type === 'table' && c.dashMode === 'col_split' && (c.cols||[]).length > 0) {
+        // ── 열별 분리 모드 (텍스트 열 자동 제외) ──
+        const colDefsC = c.cols || [];
+        const inColsC  = inputCols(colDefsC);
+        // 텍스트 열 판별: 모든 월×행에서 해당 열 값이 숫자가 아닌 게 하나라도 있으면 텍스트 열
+        const isTextCol = (colName) => {
+          for (const m of mos) {
+            const r2 = recs.find(r => r.critId === c.id && r.month === m);
+            if (!r2) continue;
+            const td2 = r2.tableData || {};
+            for (const row of (c.rows||[])) {
+              const rd = computeRowData(colDefsC, td2[row]||{});
+              const v = rd[colName];
+              if (v !== undefined && v !== '' && v !== null && isNaN(parseFloat(v))) return true;
+            }
+          }
+          return false;
+        };
+        const numColsC = inColsC.filter(col => !isTextCol(col));
+        let dispIdx = 0;
+        inColsC.forEach((colName) => {
+          if (isTextCol(colName)) return; // 텍스트 열 건너뜀
+          const ci = dispIdx++;
+          const colMonthVals = {};
+          mos.forEach(m => {
+            const r2 = recs.find(r => r.critId === c.id && r.month === m);
+            const td2 = r2?.tableData || {};
+            colMonthVals[m] = (c.rows||[]).reduce((s, row) => {
+              const rd = computeRowData(colDefsC, td2[row]||{});
+              return s + (parseFloat(rd[colName])||0);
+            }, 0);
+          });
+          const colAnnTotal = Object.values(colMonthVals).reduce((s, v) => s + v, 0);
+          const colAnnDisp  = colAnnTotal ? colAnnTotal.toLocaleString('ko-KR') : '—';
+
+          const nameCell_c = ci === 0
+            ? `<td class="fw-semibold" rowspan="${numColsC.length}" style="vertical-align:middle">${c.name}${typeTag}</td>` : '';
+          const achCellsC = ci === 0
+            ? `<td class="text-center" rowspan="${numColsC.length}" style="vertical-align:middle">${c.target > 0 ? fmtNum(c.target) : '—'}</td>
+               <td class="text-center" rowspan="${numColsC.length}" style="vertical-align:middle"><span class="badge ${bdg}">${ar}${ar !== '-' ? '%' : ''}</span></td>` : '';
+          rows += `<tr class="${ci > 0 ? 'split-sub-row' : ''}">
+            ${nameCell_c}<td class="text-muted small" style="white-space:nowrap">${colName}</td>
+            ${mos.map(m => {
+              const v = colMonthVals[m];
+              const d = v ? v.toLocaleString('ko-KR') : '';
+              return `<td class="text-center ${d ? 'fw-semibold' : 'text-muted'}" style="font-size:.78rem">${d || '—'}</td>`;
+            }).join('')}
+            <td class="text-center fw-bold">${colAnnDisp}</td>
+            ${achCellsC}
+          </tr>`;
+        });
+      } else {
+        // ── 기존 전체 합산 모드 ──
+        rows += `<tr>
+          <td class="fw-semibold">${c.name}${typeTag}</td>
+          <td class="text-muted small">${c.unit||''}</td>
+          ${mos.map(m => {
+            const d = monthDisp[m];
+            return `<td class="text-center ${d ? 'fw-semibold' : 'text-muted'}" style="font-size:.78rem">${d || '—'}</td>`;
+          }).join('')}
+          <td class="text-center fw-bold">${annDisp}</td>
+          <td class="text-center">${c.target > 0 ? fmtNum(c.target) : '—'}</td>
+          <td class="text-center"><span class="badge ${bdg}">${ar}${ar !== '-' ? '%' : ''}</span></td>
+        </tr>`;
+      }
+    });
+
+    html += `<div class="mb-4">
+      <div class="d-flex align-items-center gap-2 mb-2" style="cursor:pointer" onclick="go('proj-detail','${p.id}')">
+        <span class="proj-dot" style="background:${p.color||'#4f6ef7'}"></span>
+        <span class="fw-semibold" style="color:${p.color||'#4f6ef7'}">${p.name}</span>
+        <i class="bi bi-arrow-right-short text-muted"></i>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered tbl align-middle" style="min-width:900px;font-size:.8rem">
+          <thead class="table-light">
+            <tr>
+              <th style="min-width:120px">실적 기준</th>
+              <th>단위</th>
+              ${mos.map(m => `<th class="text-center">${m}월</th>`).join('')}
+              <th class="text-center">합계</th>
+              <th class="text-center">목표</th>
+              <th class="text-center">달성률</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  });
+
+  el.innerHTML = html;
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  SCHEDULE
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 담당자 → 색상 팔레트 (최대 12명)
+const ASSIGNEE_COLORS = [
+  '#4f6ef7','#27ae60','#e67e22','#9b59b6','#e74c3c',
+  '#1abc9c','#f39c12','#2980b9','#d35400','#16a085','#8e44ad','#c0392b'
+];
+function getAssigneeColorMap(items) {
+  const map = {};
+  let idx = 0;
+  items.forEach(item => {
+    const name = item.assignee || '';
+    if (name && !(name in map)) map[name] = ASSIGNEE_COLORS[idx++ % ASSIGNEE_COLORS.length];
+  });
+  return map;
+}
+
+function renderSchedule() {
+  const yr = D.settings.activeYear;
+  const mo = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  if (!D.schedule) D.schedule = {};
+  const items = D.schedule[yr] || [];
+  const colorMap = getAssigneeColorMap(items);
+  const gridLines = [0,1,2,3,4,5,6,7,8,9,10,11].map(i =>
+    `<div class="gantt-grid-line" style="left:${(i/12)*100}%"></div>`).join('');
+
+  // 담당자 범례
+  const legendHtml = Object.keys(colorMap).length
+    ? `<div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+        <span class="text-muted small me-1">담당자:</span>
+        ${Object.entries(colorMap).map(([name, color]) =>
+          `<span class="badge" style="background:${color};font-size:.78rem;font-weight:500">${name}</span>`
+        ).join('')}
+      </div>` : '';
+
+  let html = legendHtml + `<div class="gantt-wrap">
+    <div class="gantt-row gantt-header-row">
+      <div class="gantt-label fw-semibold text-muted" style="font-size:.78rem">사업 / 항목</div>
+      <div class="gantt-bars" style="position:static;height:auto">
+        <div class="gantt-month-header">${mo.map(m => `<div class="gantt-month-cell">${m}</div>`).join('')}</div>
+      </div>
+    </div>`;
+
+  if (!D.projects.length) {
+    html += `<div class="gantt-row"><div class="gantt-label text-muted small">사업이 없습니다.</div><div class="gantt-bars"></div></div>`;
+  }
+
+  D.projects.forEach(p => {
+    const projItems = items.filter(i => i.projId === p.id);
+    // ── 사업 헤더 행 ──
+    html += `<div class="gantt-row" style="background:#f0f4ff;min-height:38px">
+      <div class="gantt-label d-flex align-items-center justify-content-between pe-2">
+        <span style="font-size:.85rem;font-weight:700;color:${p.color||'#4f6ef7'}">${p.name}</span>
+        <button class="btn btn-sm py-0 px-1 btn-outline-primary" style="font-size:.72rem;white-space:nowrap"
+          onclick="openSchedItemModal('${p.id}')">
+          <i class="bi bi-plus-lg"></i> 항목 추가
+        </button>
+      </div>
+      <div class="gantt-bars">${gridLines}</div>
+    </div>`;
+    // ── 항목 행 ──
+    if (!projItems.length) {
+      html += `<div class="gantt-row" style="min-height:34px">
+        <div class="gantt-label text-muted ps-3" style="font-size:.76rem">항목 없음 — 위 버튼으로 추가하세요</div>
+        <div class="gantt-bars">${gridLines}</div>
+      </div>`;
+    } else {
+      projItems.forEach(item => {
+        const hasMonth = item.startMonth && item.endMonth;
+        const lp    = hasMonth ? ((item.startMonth - 1) / 12) * 100 : 0;
+        const wp    = hasMonth ? Math.max(1, ((item.endMonth - item.startMonth + 1) / 12) * 100) : 0;
+        const barColor = (item.assignee && colorMap[item.assignee]) ? colorMap[item.assignee] : (p.color || '#4f6ef7');
+        const subItems = item.subItems || [];
+        const barHtml = hasMonth
+          ? `<div class="gantt-bar d-flex align-items-center"
+              style="left:${lp}%;width:${wp}%;background:${barColor}"
+              title="${item.label}${item.assignee?' — '+item.assignee:''} (${item.startMonth}월~${item.endMonth}월)">
+              <span style="font-size:.72rem;color:#fff;padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">${item.label}</span>
+            </div>`
+          : '';
+        html += `<div class="gantt-row" style="min-height:38px">
+          <div class="gantt-label d-flex align-items-center ps-3 pe-1 gap-1">
+            <div style="flex:1;min-width:0">
+              <span style="font-size:.82rem">${item.label}</span>
+            </div>
+            <button class="btn btn-link btn-sm p-0 text-primary" title="세부 추가" style="font-size:.68rem"
+              onclick="openSubItemModal('${item.id}')">
+              <i class="bi bi-plus-circle"></i>
+            </button>
+            <button class="btn btn-link btn-sm p-0 text-secondary" title="수정"
+              onclick="openSchedItemModal('${p.id}','${item.id}')">
+              <i class="bi bi-pencil" style="font-size:.72rem"></i>
+            </button>
+            <button class="btn btn-link btn-sm p-0 text-danger" title="삭제"
+              onclick="delSchedItem('${item.id}')">
+              <i class="bi bi-trash" style="font-size:.72rem"></i>
+            </button>
+          </div>
+          <div class="gantt-bars">
+            ${gridLines}
+            ${barHtml}
+          </div>
+        </div>`;
+        // 세부 내용 행
+        subItems.forEach(sub => {
+          // 연속 구간 계산
+          const sortedMos = [...new Set(sub.months||[])].sort((a,b)=>a-b);
+          const ranges = [];
+          sortedMos.forEach(m => {
+            if (ranges.length && ranges[ranges.length-1].end === m-1) {
+              ranges[ranges.length-1].end = m;
+            } else {
+              ranges.push({start: m, end: m});
+            }
+          });
+          // 격자선 12칸
+          const gridCells = [1,2,3,4,5,6,7,8,9,10,11,12]
+            .map(() => `<div class="gantt-sub-cell"></div>`).join('');
+          // 바 렌더링 (세부항목 담당자 색상 우선, 없으면 부모 색상)
+          const subAssignee = sub.assignee || '';
+          const subBarColor = (subAssignee && colorMap[subAssignee]) ? colorMap[subAssignee] : barColor;
+          const bars = ranges.map(rng => {
+            const lp = ((rng.start - 1) / 12 * 100).toFixed(2);
+            const wp = ((rng.end - rng.start + 1) / 12 * 100).toFixed(2);
+            return `<div class="gantt-sub-bar" style="left:${lp}%;width:${wp}%;background:${subBarColor}"
+              title="${sub.label}${subAssignee?' — '+subAssignee:''} (${rng.start}월~${rng.end}월)"></div>`;
+          }).join('');
+          html += `<div class="gantt-sub-row">
+            <div class="gantt-sub-label d-flex align-items-start gap-1">
+              <div style="flex:1;min-width:0">
+                <div style="font-size:.78rem;line-height:1.3">${sub.label}</div>
+                ${sub.note ? `<div class="text-muted" style="font-size:.7rem">${sub.note}</div>` : ''}
+              </div>
+              <button class="btn btn-link btn-sm p-0 text-secondary flex-shrink-0" style="font-size:.65rem"
+                onclick="openSubItemModal('${item.id}','${sub.id}')">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <button class="btn btn-link btn-sm p-0 text-danger flex-shrink-0" style="font-size:.65rem"
+                onclick="delSubItem('${item.id}','${sub.id}')">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+            <div class="gantt-sub-months d-flex">${gridCells}${bars}</div>
+          </div>`;
+        });
+      });
+    }
+  });
+
+  html += '</div>';
+  document.getElementById('gantt-area').innerHTML = html;
+}
+
+function openSchedItemModal(projId, id) {
+  const yr = D.settings.activeYear;
+  if (!D.schedule) D.schedule = {};
+  const items = D.schedule[yr] || [];
+  const item = id ? items.find(i => i.id === id) : null;
+  document.getElementById('si-id').value       = item?.id || '';
+  document.getElementById('si-proj-id').value  = projId;
+  document.getElementById('si-label').value    = item?.label || '';
+  setMgrCombo('si-assignee', getAllMembers(), item?.assignee || '');
+  document.getElementById('si-start').value    = item?.startMonth ?? '';
+  document.getElementById('si-end').value      = item?.endMonth ?? '';
+  document.getElementById('mSchedItemTitle').textContent = item ? '일정 항목 수정' : '일정 항목 추가';
+  new bootstrap.Modal(document.getElementById('mSchedItem')).show();
+}
+
+function saveSchedItem() {
+  const label = document.getElementById('si-label').value.trim();
+  if (!label) { alert('항목명을 입력하세요.'); return; }
+  const startRaw = document.getElementById('si-start').value;
+  const endRaw   = document.getElementById('si-end').value;
+  const startMonth = startRaw ? parseInt(startRaw) : null;
+  const endMonth   = endRaw   ? parseInt(endRaw)   : null;
+  if (startMonth && endMonth && endMonth < startMonth) {
+    alert('종료 월은 시작 월과 같거나 이후여야 합니다.'); return;
+  }
+  const yr       = D.settings.activeYear;
+  const projId   = document.getElementById('si-proj-id').value;
+  const id       = document.getElementById('si-id').value;
+  const assignee = getMgrComboValue('si-assignee');
+  if (!D.schedule) D.schedule = {};
+  if (!D.schedule[yr]) D.schedule[yr] = [];
+  if (id) {
+    const idx = D.schedule[yr].findIndex(i => i.id === id);
+    if (idx >= 0) D.schedule[yr][idx] = { id, projId, label, assignee, startMonth, endMonth, subItems: D.schedule[yr][idx].subItems || [] };
+  } else {
+    D.schedule[yr].push({ id: uid(), projId, label, assignee, startMonth, endMonth });
+  }
+  save();
+  bootstrap.Modal.getInstance(document.getElementById('mSchedItem')).hide();
+  renderSchedule();
+}
+
+function openSubItemModal(itemId, subId) {
+  const yr = D.settings.activeYear;
+  const items = (D.schedule && D.schedule[yr]) || [];
+  const item = items.find(i => i.id === itemId);
+  if (!item) return;
+  document.getElementById('ss-item-id').value = itemId;
+  document.getElementById('ss-id').value = subId || '';
+  document.querySelectorAll('.sub-mo-chk').forEach(c => c.checked = false);
+  setMgrCombo('ss-assignee', getAllMembers(), '');
+  if (subId) {
+    const sub = (item.subItems || []).find(s => s.id === subId);
+    if (sub) {
+      document.getElementById('ss-label').value = sub.label || '';
+      document.getElementById('ss-note').value = sub.note || '';
+      setMgrCombo('ss-assignee', getAllMembers(), sub.assignee || '');
+      const moSet = new Set(sub.months || []);
+      document.querySelectorAll('.sub-mo-chk').forEach(c => { c.checked = moSet.has(parseInt(c.value)); });
+      document.getElementById('mSchedSubTitle').textContent = '세부 내용 수정';
+    }
+  } else {
+    document.getElementById('ss-label').value = '';
+    document.getElementById('ss-note').value = '';
+    document.getElementById('mSchedSubTitle').textContent = '세부 내용 추가';
+  }
+  new bootstrap.Modal(document.getElementById('mSchedSub')).show();
+}
+
+function saveSubItem() {
+  const label = document.getElementById('ss-label').value.trim();
+  if (!label) { alert('세부 내용을 입력하세요.'); return; }
+  const itemId = document.getElementById('ss-item-id').value;
+  const subId  = document.getElementById('ss-id').value;
+  const assignee = getMgrComboValue('ss-assignee');
+  const note   = document.getElementById('ss-note').value.trim();
+  const months = Array.from(document.querySelectorAll('.sub-mo-chk:checked')).map(c => parseInt(c.value));
+  const yr = D.settings.activeYear;
+  if (!D.schedule || !D.schedule[yr]) return;
+  const item = D.schedule[yr].find(i => i.id === itemId);
+  if (!item) return;
+  if (!item.subItems) item.subItems = [];
+  if (subId) {
+    const idx = item.subItems.findIndex(s => s.id === subId);
+    if (idx >= 0) item.subItems[idx] = { id: subId, label, assignee, note, months };
+    else item.subItems.push({ id: subId, label, assignee, note, months });
+  } else {
+    item.subItems.push({ id: uid(), label, assignee, note, months });
+  }
+  save();
+  bootstrap.Modal.getInstance(document.getElementById('mSchedSub')).hide();
+  renderSchedule();
+}
+
+function delSubItem(itemId, subId) {
+  if (!confirm('세부 내용을 삭제하시겠습니까?')) return;
+  const yr = D.settings.activeYear;
+  if (!D.schedule || !D.schedule[yr]) return;
+  const item = D.schedule[yr].find(i => i.id === itemId);
+  if (!item) return;
+  item.subItems = (item.subItems || []).filter(s => s.id !== subId);
+  save(); renderSchedule();
+}
+
+function delSchedItem(id) {
+  if (!confirm('항목을 삭제하시겠습니까?')) return;
+  const yr = D.settings.activeYear;
+  if (D.schedule && D.schedule[yr]) {
+    D.schedule[yr] = D.schedule[yr].filter(i => i.id !== id);
+  }
+  save(); renderSchedule();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  PROJECTS GRID
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function renderProjects() {
+  const y = D.settings.activeYear;
+  const el = document.getElementById('proj-grid');
+  if (!D.projects.length) {
+    el.innerHTML = `<div class="col-12"><div class="empty-state">
+      <i class="bi bi-folder-plus"></i>아직 사업이 없습니다.<br>
+      <button class="btn btn-primary btn-sm mt-3" onclick="openProjectModal()">
+        <i class="bi bi-plus-lg"></i> 첫 사업 추가하기
+      </button></div></div>`;
+    return;
+  }
+  el.innerHTML = D.projects.map(p => {
+    const yd = getYearData(p, y);
+  const used = totalExpenses(p, y);
+    const r = yd.totalBudget > 0 ? ((used / yd.totalBudget) * 100).toFixed(1) : 0;
+    const bc = r > 90 ? 'bg-danger' : r > 70 ? 'bg-warning' : 'bg-success';
+    return `<div class="col-md-4 col-lg-3">
+      <div class="stat-box h-100" style="cursor:pointer;border-top:4px solid ${p.color||'#4f6ef7'}"
+           onclick="go('proj-detail','${p.id}')">
+        <div class="fw-bold mb-1">${p.name}</div>
+        <div class="text-muted small mb-1">${projMgrDisplay(p) || '담당자 없음'}</div>
+        ${p.desc ? `<div class="text-muted mb-2" style="font-size:.76rem;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${p.desc}</div>` : ''}
+        <div class="text-muted small mb-3" style="font-size:.72rem">${y}년 기준</div>
+        <div class="d-flex justify-content-between small text-muted mb-1">
+          <span>예산 사용률</span><span class="fw-bold">${r}%</span>
+        </div>
+        <div class="progress mb-3 prog-sm"><div class="progress-bar ${bc}" style="width:${Math.min(r,100)}%"></div></div>
+        <div class="text-muted small">사용: ₩${fmt(used)}</div>
+        <div class="text-muted small">잔액: ₩${fmt((yd.totalBudget || 0) - used)}</div>
+        <div class="mt-3 pt-3 border-top d-flex gap-3 text-muted small">
+          <span><i class="bi bi-cash-stack"></i> ${yearExpenses(p,y).length}건</span>
+          <span><i class="bi bi-clipboard-check"></i> ${yearPerfRecs(p,y).length}건</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  PROJECT DETAIL
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function renderDetail() {
+  const p = getProj(); if (!p) return;
+  const y = D.settings.activeYear;
+  const yd = getYearData(p, y);
+  document.getElementById('detail-title').textContent = p.name;
+  const mgrEl = document.getElementById('detail-mgr');
+  if (mgrEl) {
+    const main = p.mainMgr || p.mgr || '';
+    const sub  = p.subMgr || '';
+    const parts = [];
+    if (main) parts.push('<span class="me-3"><i class="bi bi-person-fill me-1" style="color:#4f6ef7"></i>' + escHtml(main) + ' <span class="badge text-bg-primary" style="font-size:.65rem;vertical-align:middle">주</span></span>');
+    if (sub)  parts.push('<span><i class="bi bi-person me-1" style="color:#888"></i>' + escHtml(sub)  + ' <span class="badge text-bg-secondary" style="font-size:.65rem;vertical-align:middle">부</span></span>');
+    mgrEl.innerHTML = parts.join('');
+  }
+  // 예산 과목 + 문서번호 메타 표시
+  const metaEl = document.getElementById('detail-meta');
+  if (metaEl) {
+    const cats = (yd.budgetCategories || []);
+    const metaParts = [];
+    if (cats.length) {
+      const catNames = cats.map(c => c.name).filter(Boolean).join(' · ');
+      metaParts.push(`<span><i class="bi bi-tags me-1" style="color:#aaa"></i><span class="text-muted">${escHtml(catNames)}</span></span>`);
+    }
+    if (yd.docNumber) {
+      metaParts.push(`<span><i class="bi bi-file-text me-1" style="color:#aaa"></i><span class="text-muted">${escHtml(yd.docNumber)}</span></span>`);
+    }
+    metaEl.innerHTML = metaParts.join('');
+  }
+
+  const used = totalExpenses(p, y);
+  const left = (yd.totalBudget || 0) - used;
+  const r = yd.totalBudget > 0 ? ((used / yd.totalBudget) * 100).toFixed(1) : 0;
+  document.getElementById('detail-stats').innerHTML = `
+    <div class="col-6 col-md-3"><div class="stat-box">
+      <div class="text-muted small">총 예산 (${y})</div>
+      <div class="fw-bold">₩${fmt(yd.totalBudget || 0)}</div>
+    </div></div>
+    <div class="col-6 col-md-3"><div class="stat-box">
+      <div class="text-muted small">사용액</div>
+      <div class="fw-bold text-danger">₩${fmt(used)}</div>
+    </div></div>
+    <div class="col-6 col-md-3"><div class="stat-box">
+      <div class="text-muted small">잔액</div>
+      <div class="fw-bold text-success">₩${fmt(left)}</div>
+    </div></div>
+    <div class="col-6 col-md-3"><div class="stat-box">
+      <div class="text-muted small">사용률</div>
+      <div class="fw-bold">${r}%</div>
+      <div class="progress mt-1 prog-sm">
+        <div class="progress-bar bg-primary" style="width:${Math.min(r,100)}%"></div>
+      </div>
+    </div></div>`;
+  renderDetailPerfSummary();
+  renderPerfTab(); renderBudgetTab(); renderBudgetCatTab(); renderPerfCritTab(); renderBudgetAmendTab();
+}
+
+function renderDetailPerfSummary() {
+  const p = getProj(); if (!p) return;
+  const y = D.settings.activeYear;
+  const yd = getYearData(p, y);
+  const crits = yd.performanceCriteria || [];
+  const el = document.getElementById('detail-perf-summary');
+  if (!el) return;
+
+  if (!crits.length) { el.innerHTML = ''; return; }
+
+  const recs = yearPerfRecs(p, y);
+  const mos  = [1,2,3,4,5,6,7,8,9,10,11,12];
+
+  let rows = '';
+  crits.forEach(c => {
+    const colDefsY = c.cols || [];
+    const inColsY  = inputCols(colDefsY);
+    const monthVals = {}, monthDisp = {}, monthNums = {};
+    let hasTextEver = false;
+    mos.forEach(m => {
+      if (c.type === 'table') {
+        const r2 = recs.find(r => r.critId === c.id && r.month === m);
+        const td2 = r2?.tableData || {};
+        let numSum = 0, nums = [], hasText = false;
+        (c.rows||[]).forEach(row => {
+          const rd = computeRowData(colDefsY, td2[row]||{});
+          inColsY.forEach(col => {
+            const v = rd[col];
+            if (v !== undefined && v !== '' && v !== null) {
+              const n = parseFloat(v);
+              if (isNaN(n)) hasText = true;
+              else { numSum += n; nums.push(n); }
+            }
+          });
+        });
+        monthVals[m] = numSum; monthNums[m] = nums;
+        if (hasText) hasTextEver = true;
+        monthDisp[m] = hasText ? (nums.length > 0 ? nums.map(n=>n.toLocaleString('ko-KR')).join('/') : '') : (numSum ? numSum.toLocaleString('ko-KR') : '');
+      } else {
+        const v = recs.filter(r => r.critId === c.id && r.month === m).reduce((s, r) => s + (r.val||0), 0);
+        monthVals[m] = v; monthDisp[m] = v ? fmtNum(v) : '';
+      }
+    });
+    const annTotal = Object.values(monthVals).reduce((s, v) => s + v, 0);
+    const monthsWithData = Object.values(monthVals).filter(v => v > 0).length;
+    const isAvg = c.aggr === 'avg';
+    const annVal = (isAvg && monthsWithData > 0) ? annTotal / monthsWithData : annTotal;
+    let annDisp;
+    if (hasTextEver) {
+      const maxLen = Math.max(0, ...Object.values(monthNums).map(a => a.length));
+      const posSums = Array.from({length: maxLen}, (_, i) =>
+        Object.values(monthNums).reduce((s, arr) => s + (arr[i]||0), 0));
+      const posVals = isAvg && monthsWithData > 0 ? posSums.map(v => v / monthsWithData) : posSums;
+      annDisp = posVals.length > 0 ? posVals.map(n=>n.toLocaleString('ko-KR', {maximumFractionDigits:1})).join('/') : '—';
+    } else {
+      annDisp = annVal > 0 ? annVal.toLocaleString('ko-KR', {maximumFractionDigits:1}) : '—';
+    }
+    const ar  = c.target > 0 ? ((annVal / c.target) * 100).toFixed(1) : '-';
+    const bdg = ar === '-' ? 'bg-secondary' : parseFloat(ar) >= 100 ? 'bg-success' : parseFloat(ar) >= 50 ? 'bg-warning text-dark' : 'bg-secondary';
+    const typeTag = '';
+
+    // ── 행별 분리 ──
+    if (c.type === 'table' && c.dashMode === 'split' && (c.rows||[]).length > 0) {
+      const cRows = c.rows || [];
+      cRows.forEach((rowLabel, ri) => {
+        const rowMonthVals = {};
+        mos.forEach(m => {
+          const r2 = recs.find(r => r.critId === c.id && r.month === m);
+          const td2 = r2?.tableData || {};
+          const rd = computeRowData(colDefsY, td2[rowLabel]||{});
+          rowMonthVals[m] = inColsY.reduce((s, col) => s + (parseFloat(rd[col])||0), 0);
+        });
+        const rowAnnTotal = Object.values(rowMonthVals).reduce((s, v) => s + v, 0);
+        const rowAnnDisp  = rowAnnTotal ? rowAnnTotal.toLocaleString('ko-KR') : '—';
+
+        const nameCell_r = ri === 0
+          ? `<td class="fw-semibold" rowspan="${cRows.length}" style="vertical-align:middle">${c.name}${typeTag}</td>` : '';
+        const achCells = ri === 0
+          ? `<td class="text-center" rowspan="${cRows.length}" style="vertical-align:middle">${c.target > 0 ? fmtNum(c.target) : '—'}</td>
+             <td class="text-center" rowspan="${cRows.length}" style="vertical-align:middle"><span class="badge ${bdg}">${ar}${ar !== '-' ? '%' : ''}</span></td>` : '';
+        rows += `<tr class="${ri > 0 ? 'split-sub-row' : ''}">
+          ${nameCell_r}<td class="text-muted small" style="white-space:nowrap">${rowLabel}</td>
+          ${mos.map(m => { const v = rowMonthVals[m]; const d = v ? v.toLocaleString('ko-KR') : '';
+            return `<td class="text-center ${d?'fw-semibold':'text-muted'}" style="font-size:.78rem">${d||'—'}</td>`; }).join('')}
+          <td class="text-center fw-bold">${rowAnnDisp}</td>${achCells}
+        </tr>`;
+      });
+    // ── 열별 분리 ──
+    } else if (c.type === 'table' && c.dashMode === 'col_split' && (c.cols||[]).length > 0) {
+      const isTextCol = (colName) => {
+        for (const m of mos) {
+          const r2 = recs.find(r => r.critId === c.id && r.month === m);
+          if (!r2) continue;
+          const td2 = r2.tableData || {};
+          for (const row of (c.rows||[])) {
+            const rd = computeRowData(colDefsY, td2[row]||{});
+            const v = rd[colName];
+            if (v !== undefined && v !== '' && v !== null && isNaN(parseFloat(v))) return true;
+          }
+        }
+        return false;
+      };
+      const numCols = inColsY.filter(col => !isTextCol(col));
+      let dispIdx = 0;
+      inColsY.forEach(colName => {
+        if (isTextCol(colName)) return;
+        const ci = dispIdx++;
+        const colMonthVals = {};
+        mos.forEach(m => {
+          const r2 = recs.find(r => r.critId === c.id && r.month === m);
+          const td2 = r2?.tableData || {};
+          colMonthVals[m] = (c.rows||[]).reduce((s, row) => {
+            const rd = computeRowData(colDefsY, td2[row]||{});
+            return s + (parseFloat(rd[colName])||0);
+          }, 0);
+        });
+        const colAnnTotal = Object.values(colMonthVals).reduce((s, v) => s + v, 0);
+        const colAnnDisp  = colAnnTotal ? colAnnTotal.toLocaleString('ko-KR') : '—';
+
+        const nameCell_c = ci === 0
+          ? `<td class="fw-semibold" rowspan="${numCols.length}" style="vertical-align:middle">${c.name}${typeTag}</td>` : '';
+        const achCellsC = ci === 0
+          ? `<td class="text-center" rowspan="${numCols.length}" style="vertical-align:middle">${c.target > 0 ? fmtNum(c.target) : '—'}</td>
+             <td class="text-center" rowspan="${numCols.length}" style="vertical-align:middle"><span class="badge ${bdg}">${ar}${ar !== '-' ? '%' : ''}</span></td>` : '';
+        rows += `<tr class="${ci > 0 ? 'split-sub-row' : ''}">
+          ${nameCell_c}<td class="text-muted small" style="white-space:nowrap">${colName}</td>
+          ${mos.map(m => { const v = colMonthVals[m]; const d = v ? v.toLocaleString('ko-KR') : '';
+            return `<td class="text-center ${d?'fw-semibold':'text-muted'}" style="font-size:.78rem">${d||'—'}</td>`; }).join('')}
+          <td class="text-center fw-bold">${colAnnDisp}</td>${achCellsC}
+        </tr>`;
+      });
+    // ── 전체 합산 ──
+    } else {
+      rows += `<tr>
+        <td class="fw-semibold">${c.name}${typeTag}</td>
+        <td class="text-muted small">${c.unit||''}</td>
+        ${mos.map(m => { const d = monthDisp[m];
+          return `<td class="text-center ${d?'fw-semibold':'text-muted'}" style="font-size:.78rem">${d||'—'}</td>`; }).join('')}
+        <td class="text-center fw-bold">${annDisp}</td>
+        <td class="text-center">${c.target > 0 ? fmtNum(c.target) : '—'}</td>
+        <td class="text-center"><span class="badge ${bdg}">${ar}${ar !== '-' ? '%' : ''}</span></td>
+      </tr>`;
+    }
+  });
+
+  el.innerHTML = `
+    <div class="card-box mb-3">
+      <div class="fw-semibold mb-2">📊 ${y}년 실적 현황</div>
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered tbl align-middle" style="min-width:900px;font-size:.8rem">
+          <thead class="table-light">
+            <tr>
+              <th style="min-width:120px">실적 기준</th>
+              <th>단위</th>
+              ${mos.map(m => `<th class="text-center">${m}월</th>`).join('')}
+              <th class="text-center">합계</th>
+              <th class="text-center">목표</th>
+              <th class="text-center">달성률</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+// ── 실적 탭 ──
+let perfViewMonth = new Date().getMonth() + 1; // 현재 월을 기본으로
+
+function renderPerfTab(selectedMonth) {
+  const p = getProj(); if (!p) return;
+  const y = D.settings.activeYear;
+  const yd = getYearData(p, y);
+  const crits = yd.performanceCriteria || [];
+  const recs  = yearPerfRecs(p, y);
+  const mos   = [1,2,3,4,5,6,7,8,9,10,11,12];
+
+  if (!crits.length) {
+    document.getElementById('perf-content').innerHTML =
+      `<div class="empty-state"><i class="bi bi-clipboard-data"></i>${y}년 실적 기준이 없습니다.<br>"실적 기준 설정" 탭에서 먼저 기준을 추가해주세요.</div>`;
+    return;
+  }
+
+  let h = '';
+
+  // ── 기준 순서대로 단순형/테이블형 모두 렌더링 ──
+  crits.forEach(c => {
+    if (c.type === 'table') {
+      // ── 테이블형 ──
+      const rows = c.rows || [];
+      const filledMonths = [...new Set(recs.filter(r => r.critId === c.id).map(r => r.month))];
+      const viewMo = selectedMonth || perfViewMonth;
+      const rec = recs.find(r => r.critId === c.id && r.month === viewMo);
+      const td  = rec?.tableData || {};
+      const colDefs = c.cols || [];
+      const inCols  = inputCols(colDefs);
+
+      const tblAnnualTotal = mos.reduce((sum, m) => {
+        const r2 = recs.find(r => r.critId === c.id && r.month === m);
+        const td2 = r2?.tableData || {};
+        return sum + (c.rows||[]).reduce((rs, row) => {
+          const rd = computeRowData(colDefs, td2[row]||{});
+          return rs + inputCols(colDefs).reduce((cs, col) => cs + (parseFloat(rd[col])||0), 0);
+        }, 0);
+      }, 0);
+      const tblMosWithData = mos.filter(m => {
+        const r2 = recs.find(r => r.critId === c.id && r.month === m);
+        if (!r2?.tableData) return false;
+        return (c.rows||[]).some(row => {
+          const rd = computeRowData(colDefs, r2.tableData[row]||{});
+          return inputCols(colDefs).some(col => parseFloat(rd[col]) > 0);
+        });
+      }).length;
+      const tblIsAvg = c.aggr === 'avg';
+      const tblAnnualVal = (tblIsAvg && tblMosWithData > 0) ? tblAnnualTotal / tblMosWithData : tblAnnualTotal;
+      const tblAr = c.target > 0 ? ((tblAnnualVal / c.target) * 100).toFixed(1) : '-';
+      const tblBadge = tblAr === '-' ? 'bg-secondary' : parseFloat(tblAr) >= 100 ? 'bg-success' : parseFloat(tblAr) >= 50 ? 'bg-warning text-dark' : 'bg-secondary';
+
+      h += `<div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="d-flex align-items-center flex-wrap gap-2">
+            <span class="fw-semibold">${c.name}</span>
+            <span class="type-badge-table">테이블형</span>
+            ${tblIsAvg ? `<span class="badge bg-info text-dark" style="font-size:.7rem">평균</span>` : ''}
+            ${c.target > 0 ? `<span class="text-muted small">연간목표 ${fmtNum(c.target)}${c.unit||''}</span>
+            <span class="badge ${tblBadge}">${tblAr}%</span>` : ''}
+          </div>
+        </div>
+        <div class="month-tab-btns">
+          ${mos.map(m => {
+            const hasDat = filledMonths.includes(m);
+            const isSel  = m === viewMo;
+            return `<button class="month-tab-btn ${hasDat ? 'has-data' : ''} ${isSel ? 'selected' : ''}"
+              onclick="perfViewMonth=${m};renderPerfTab(${m})">${m}월${hasDat ? '✓' : ''}</button>`;
+          }).join('')}
+        </div>
+        <div class="table-responsive mt-2">
+          <table class="table table-sm table-bordered tbl" style="font-size:.8rem">
+            <thead class="table-light">
+              <tr>
+                <th style="min-width:100px"></th>
+                ${colDefs.map(cd => {
+                  const isFormula = typeof cd === 'object' && cd.type === 'formula';
+                  const name = typeof cd === 'string' ? cd : cd.name;
+                  return `<th class="text-center${isFormula?' table-info':''}" style="min-width:120px">${name}${isFormula?'<br><small class="text-muted" style="font-size:.65rem">자동</small>':''}</th>`;
+                }).join('')}
+                <th class="text-center table-warning">행 합계</th>
+              </tr>
+            </thead><tbody>
+              ${rows.map((row, ri) => {
+                const storedRowData = td[row] || {};
+                const rowData = computeRowData(colDefs, storedRowData);
+                const rowTot = rowSummaryDisplay(inCols, rowData);
+                return `<tr>
+                  <td class="fw-semibold small">${row}</td>
+                  ${colDefs.map((cd, ci) => {
+                    const isFormula = typeof cd === 'object' && cd.type === 'formula';
+                    const name = typeof cd === 'string' ? cd : cd.name;
+                    const val = rowData[name] ?? '';
+                    if (isFormula) {
+                      return `<td class="text-center bg-light text-primary fw-semibold"
+                        id="tif-${c.id}-${viewMo}-${ri}-${ci}">${fmtNum(val)}</td>`;
+                    }
+                    return `<td class="p-1">
+                      <input type="text"
+                        class="form-control form-control-sm p-1 tbl-perf-input" lang="ko"
+                        style="width:100%;min-width:60px"
+                        value="${val}" placeholder=""
+                        data-crit="${c.id}" data-month="${viewMo}"
+                        data-row-i="${ri}" data-col="${name}"
+                        oninput="if(!event.isComposing)recalcTableInline('${c.id}',${viewMo},${ri})"
+                        oncompositionend="recalcTableInline('${c.id}',${viewMo},${ri})"
+                        onfocus="this.select()">
+                    </td>`;
+                  }).join('')}
+                  <td class="text-center fw-bold table-warning" id="tir-${c.id}-${viewMo}-${ri}">${fmtNum(rowTot)}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+        <div class="d-flex align-items-center gap-2 mt-2">
+          <button class="btn btn-primary btn-sm" onclick="savePerfTableInline('${c.id}',${viewMo})">
+            <i class="bi bi-save"></i> 저장
+          </button>
+          ${rec ? `<button class="btn btn-sm btn-outline-danger" onclick="delPerf('${rec.id}')">
+            <i class="bi bi-trash"></i> 삭제
+          </button>` : ''}
+        </div>
+      </div>`;
+
+    } else {
+      // ── 단순형 ──
+      const byMo = {};
+      recs.filter(r => r.critId === c.id).forEach(r => { byMo[r.month] = (byMo[r.month] || 0) + r.val; });
+      const total = Object.values(byMo).reduce((s, v) => s + v, 0);
+      const mwData = Object.values(byMo).filter(v => v > 0).length;
+      const isAvgC = c.aggr === 'avg';
+      const totalVal = (isAvgC && mwData > 0) ? total / mwData : total;
+      const totalDisp = totalVal ? totalVal.toLocaleString('ko-KR', {maximumFractionDigits:1}) : '0';
+      const ar = c.target > 0 ? ((totalVal / c.target) * 100).toFixed(1) : '-';
+      const badge = ar === '-' ? 'bg-secondary' : parseFloat(ar) >= 100 ? 'bg-success' : parseFloat(ar) >= 50 ? 'bg-warning text-dark' : 'bg-secondary';
+      const aggrLabel = isAvgC ? '평균' : '합계';
+      h += `<div class="mb-4">
+        <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+          <span class="fw-semibold">${c.name}</span>
+          ${c.unit ? `<span class="text-muted small">(${c.unit})</span>` : ''}
+          ${isAvgC ? `<span class="badge bg-info text-dark" style="font-size:.7rem">평균</span>` : ''}
+          ${c.target > 0 ? `<span class="text-muted small">연간목표 ${fmtNum(c.target)}${c.unit||''}</span>
+          <span class="badge ${badge}">${ar}%</span>` : ''}
+        </div>
+        <div class="table-responsive">
+        <table class="table tbl table-bordered align-middle" style="min-width:800px">
+          <thead class="table-light">
+            <tr>${mos.map(m => `<th class="text-center">${m}월</th>`).join('')}
+              <th class="text-center">${aggrLabel}</th></tr>
+          </thead><tbody>
+          <tr>
+            ${mos.map(m => `<td class="text-center p-1">
+              <input type="number" min="0"
+                class="form-control form-control-sm text-center p-0 border-0 bg-transparent"
+                style="width:58px;margin:auto"
+                value="${byMo[m] !== undefined ? byMo[m] : ''}"
+                placeholder="—"
+                onchange="savePerfInline('${c.id}',${m},this)"
+                onfocus="this.select()">
+            </td>`).join('')}
+            <td class="text-center fw-bold" id="perf-total-${c.id}">${totalDisp}</td>
+          </tr>
+          </tbody>
+        </table></div>
+      </div>`;
+    }
+  });
+
+  // ── 실적 입력 내역 (단순형 + 테이블형) ──
+  const allHistRecs = [...recs].sort((a, b) => b.month - a.month).slice(0, 20);
+
+  if (allHistRecs.length) {
+    h += `<div class="fw-semibold mb-2 mt-3">실적 입력 내역</div>
+      <div class="table-responsive">
+      <table class="table tbl table-sm table-hover">
+        <thead class="table-light">
+          <tr>
+            <th style="width:60px">월</th>
+            <th style="width:160px">기준</th>
+            <th class="text-end" style="width:120px">실적</th>
+            <th style="width:160px">담당자</th>
+            <th>비고</th>
+            <th style="width:60px"></th>
+          </tr>
+        </thead><tbody>
+          ${allHistRecs.map(r => {
+            const c = crits.find(x => x.id === r.critId);
+            let perfDisp = '-';
+            if (c && c.type === 'table') {
+              const inC = inputCols(c.cols || []);
+              const sum = (c.rows || []).reduce((s, row) => {
+                const rd = r.tableData?.[row] || {};
+                return s + inC.reduce((cs, col) => cs + (parseFloat(rd[col]) || 0), 0);
+              }, 0);
+              perfDisp = sum > 0 ? fmtNum(sum) : '입력됨';
+            } else {
+              perfDisp = `${fmtNum(r.val)} ${c ? c.unit || '' : ''}`.trim();
+            }
+            const typeTag = c?.type === 'table'
+              ? '<span class="type-badge-table ms-1" style="font-size:.6rem">표</span>' : '';
+            return `<tr>
+              <td>${r.month}월</td>
+              <td>${c ? c.name : '-'}${typeTag}</td>
+              <td class="text-end">${perfDisp}</td>
+              <td>${r.mgr || '-'}</td>
+              <td class="text-muted">${r.note || ''}</td>
+              <td class="text-nowrap">
+                <button class="btn btn-link btn-sm text-secondary p-0 me-1" onclick="openPerfModal('${r.id}')"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-link btn-sm text-danger p-0" onclick="delPerf('${r.id}')"><i class="bi bi-trash"></i></button>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table></div>`;
+  }
+
+  document.getElementById('perf-content').innerHTML = h;
+}
+
+// ── 예산 사용 내역 탭 ──
+function renderBudgetTab() {
+  const p = getProj(); if (!p) return;
+  const y  = D.settings.activeYear;
+  const yd = getYearData(p, y);
+  const cats = yd.budgetCategories || [];
+  const mf   = parseInt(document.getElementById('budget-month-filter')?.value || 0);
+  const all  = yearExpenses(p, y);
+  const exps = mf ? all.filter(e => e.month === mf) : all;
+
+  const catTot = {};
+  all.forEach(e => { catTot[e.catId] = (catTot[e.catId] || 0) + e.amount; });
+
+  let h = '';
+  if (cats.length) {
+    // 항목별 사용액 맵
+    const itemTot = {};
+    all.forEach(e => { if (e.itemId) itemTot[e.itemId] = (itemTot[e.itemId] || 0) + e.amount; });
+
+    // ── 예산 과목 카드 ──
+    h += `<div class="text-muted small fw-semibold mb-1">예산 과목</div><div class="row g-2 mb-3">`;
+    cats.forEach(c => {
+      const used = catTot[c.id] || 0;
+      const r = c.budget > 0 ? ((used / c.budget) * 100).toFixed(1) : '-';
+      const bc = parseFloat(r) > 90 ? 'bg-danger' : parseFloat(r) > 70 ? 'bg-warning' : 'bg-primary';
+      h += `<div class="col-md-4 col-lg-3">
+        <div class="border rounded p-2">
+          <div class="fw-semibold small text-truncate" title="${c.name}">${shortCatName(c.name)}</div>
+          <div class="text-muted" style="font-size:.72rem">배정: ₩${fmt(c.budget || 0)}</div>
+          <div class="progress my-1 prog-sm"><div class="progress-bar ${bc}" style="width:${Math.min(parseFloat(r)||0,100)}%"></div></div>
+          <div class="d-flex justify-content-between" style="font-size:.72rem">
+            <span class="text-danger">사용 ₩${fmt(used)}</span>
+            <span class="text-success">잔 ₩${fmt((c.budget||0)-used)}</span>
+          </div>
+        </div>
+      </div>`;
+    });
+    h += '</div>';
+
+    // ── 예산 항목 카드 ──
+    const allItems = cats.flatMap(c => (c.items||[]).map(it => ({...it, catName: shortCatName(c.name)})));
+    if (allItems.length) {
+      h += `<div class="text-muted small fw-semibold mb-1">예산 항목</div><div class="row g-2 mb-4">`;
+      allItems.forEach(it => {
+        const iUsed = itemTot[it.id] || 0;
+        const iLeft = (it.budget||0) - iUsed;
+        const ir = it.budget > 0 ? ((iUsed/it.budget)*100).toFixed(1) : '-';
+        const ib = parseFloat(ir) > 90 ? 'bg-danger' : parseFloat(ir) > 70 ? 'bg-warning' : 'bg-primary';
+        h += `<div class="col-md-4 col-lg-3">
+          <div class="border rounded p-2">
+            <div class="fw-semibold small">${it.name}</div>
+            <div class="text-muted" style="font-size:.7rem">${it.catName}</div>
+            ${it.budget ? `<div class="text-muted" style="font-size:.72rem">배정: ₩${fmt(it.budget)}</div>
+            <div class="progress my-1 prog-sm"><div class="progress-bar ${ib}" style="width:${Math.min(parseFloat(ir)||0,100)}%"></div></div>
+            <div class="d-flex justify-content-between" style="font-size:.72rem">
+              <span class="text-danger">사용 ₩${fmt(iUsed)}</span>
+              <span class="text-success">잔 ₩${fmt(iLeft)}</span>
+            </div>` : `<div class="text-danger mt-1" style="font-size:.72rem">사용 ₩${fmt(iUsed)}</div>`}
+          </div>
+        </div>`;
+      });
+      h += '</div>';
+    } else {
+      h += '<div class="mb-4"></div>';
+    }
+  }
+
+  h += `<div class="table-responsive">
+    <table class="table tbl table-sm table-hover align-middle">
+      <thead class="table-light">
+        <tr><th>날짜</th><th>내용</th><th>대상</th><th>구분</th>
+            <th class="text-end">금액(원)</th><th>담당자</th><th>비고</th><th></th></tr>
+      </thead><tbody>`;
+
+  if (!exps.length) {
+    h += `<tr><td colspan="8" class="text-center text-muted py-4">지출 내역이 없습니다.</td></tr>`;
+  } else {
+    const sorted = [...exps].sort((a, b) => new Date(b.date) - new Date(a.date));
+    sorted.forEach(e => {
+      const cat = cats.find(c => c.id === e.catId);
+      const item = cat ? (cat.items || []).find(it => it.id === e.itemId) : null;
+      const catDisp = cat ? shortCatName(cat.name) : '기타';
+      const itemDisp = item ? ` · ${item.name}` : '';
+      h += `<tr>
+        <td>${e.date}</td><td>${e.desc}</td>
+        <td class="text-muted">${e.target || ''}</td>
+        <td><span class="badge bg-light text-dark cat-badge">${catDisp}${itemDisp}</span></td>
+        <td class="text-end fw-semibold">₩${fmt(e.amount)}</td>
+        <td class="text-muted">${e.mgr || ''}</td>
+        <td class="text-muted">${e.note || ''}</td>
+        <td class="text-nowrap">
+          <button class="btn btn-link btn-sm text-secondary p-0 me-1" onclick="openExpenseModal('${e.id}')"><i class="bi bi-pencil"></i></button>
+          <button class="btn btn-link btn-sm text-danger p-0" onclick="delExpense('${e.id}')"><i class="bi bi-trash"></i></button>
+        </td>
+      </tr>`;
+    });
+    const tot = sorted.reduce((s, e) => s + e.amount, 0);
+    h += `<tr class="table-light fw-bold">
+      <td colspan="4">합계 (${exps.length}건)</td>
+      <td class="text-end">₩${fmt(tot)}</td>
+      <td colspan="3"></td>
+    </tr>`;
+  }
+  h += '</tbody></table></div>';
+  document.getElementById('budget-content').innerHTML = h;
+}
+
+// ── 예산 항목 설정 탭 ──
+function renderBudgetCatTab() {
+  const p = getProj(); if (!p) return;
+  const y = D.settings.activeYear;
+  const yd = getYearData(p, y);
+  const cats = yd.budgetCategories || [];
+  document.getElementById('budget-cat-year-badge').textContent = y + '년';
+
+  const catTot = {};
+  yearExpenses(p, y).forEach(e => { catTot[e.catId] = (catTot[e.catId] || 0) + e.amount; });
+
+  if (!cats.length) {
+    document.getElementById('budget-cat-content').innerHTML =
+      `<div class="empty-state"><i class="bi bi-tags"></i>${y}년 예산 과목이 없습니다.<br>예산 과목 추가 또는 이전 연도에서 복사해서 시작하세요.</div>`;
+    return;
+  }
+
+  let totB = 0, totU = 0;
+  const rows = cats.map(c => {
+    const used = catTot[c.id] || 0;
+    const left = (c.budget || 0) - used;
+    const r = c.budget > 0 ? ((used / c.budget) * 100).toFixed(1) : 0;
+    const bc = r > 90 ? 'bg-danger' : r > 70 ? 'bg-warning' : 'bg-success';
+    totB += c.budget || 0; totU += used;
+    const items = c.items || [];
+    const itemRows = items.map(it => {
+      const iUsed = (p.expenses||[]).filter(e => e.itemId === it.id && e.year == y).reduce((s,e)=>s+e.amount,0);
+      const iLeft = (it.budget||0) - iUsed;
+      const ir = it.budget > 0 ? ((iUsed/it.budget)*100).toFixed(1) : 0;
+      const ib = ir > 90 ? 'bg-danger' : ir > 70 ? 'bg-warning' : 'bg-success';
+      return `<tr class="table-light" style="font-size:.82rem">
+        <td class="ps-5 text-muted"><i class="bi bi-dash"></i> ${it.name}</td>
+        <td class="text-end text-muted">${it.budget ? '₩'+fmt(it.budget) : ''}</td>
+        <td class="text-end text-danger" style="font-size:.8rem">${iUsed ? '₩'+fmt(iUsed) : ''}</td>
+        <td class="text-end text-success" style="font-size:.8rem">${it.budget ? '₩'+fmt(iLeft) : ''}</td>
+        <td>${it.budget ? `<div class="d-flex align-items-center gap-1"><div class="progress flex-grow-1 prog-sm"><div class="progress-bar ${ib}" style="width:${Math.min(ir,100)}%"></div></div><small>${ir}%</small></div>` : ''}</td>
+        <td>
+          <button class="btn btn-link btn-sm text-secondary p-0 me-1" onclick="openItemModal('${c.id}','${it.id}')"><i class="bi bi-pencil"></i></button>
+          <button class="btn btn-link btn-sm text-danger p-0" onclick="delCatItem('${c.id}','${it.id}')"><i class="bi bi-trash"></i></button>
+        </td>
+      </tr>`;
+    }).join('');
+    const addRow = `<tr class="table-light" style="font-size:.82rem">
+      <td class="ps-5"><button class="btn btn-link btn-sm p-0 text-primary" onclick="openItemModal('${c.id}')"><i class="bi bi-plus-circle"></i> 항목 추가</button></td>
+      <td colspan="5"></td>
+    </tr>`;
+    return `<tr>
+      <td class="fw-semibold" title="${c.name}">${shortCatName(c.name)}</td>
+      <td class="text-end">₩${fmt(c.budget || 0)}</td>
+      <td class="text-end text-danger">₩${fmt(used)}</td>
+      <td class="text-end text-success">₩${fmt(left)}</td>
+      <td>
+        <div class="d-flex align-items-center gap-2">
+          <div class="progress flex-grow-1 prog-sm"><div class="progress-bar ${bc}" style="width:${Math.min(r,100)}%"></div></div>
+          <small>${r}%</small>
+        </div>
+      </td>
+      <td>
+        <button class="btn btn-link btn-sm text-secondary p-0 me-1" onclick="openCatModal('${c.id}')"><i class="bi bi-pencil"></i></button>
+        <button class="btn btn-link btn-sm text-danger p-0" onclick="delCat('${c.id}')"><i class="bi bi-trash"></i></button>
+      </td>
+    </tr>${itemRows}${addRow}`;
+  }).join('');
+
+  document.getElementById('budget-cat-content').innerHTML = `
+    <div class="table-responsive">
+    <table class="table tbl table-hover align-middle">
+      <thead class="table-light">
+        <tr><th>예산 과목</th><th class="text-end">배정 예산</th><th class="text-end">사용액</th>
+            <th class="text-end">잔액</th><th style="width:130px">사용률</th><th></th></tr>
+      </thead><tbody>
+        ${rows}
+        <tr class="table-light fw-bold">
+          <td>합계</td>
+          <td class="text-end">₩${fmt(totB)}</td>
+          <td class="text-end text-danger">₩${fmt(totU)}</td>
+          <td class="text-end text-success">₩${fmt(totB - totU)}</td>
+          <td colspan="2"></td>
+        </tr>
+      </tbody>
+    </table></div>`;
+}
+
+// ── 실적 기준 설정 탭 ──
+function renderPerfCritTab() {
+  const p = getProj(); if (!p) return;
+  const y = D.settings.activeYear;
+  const yd = getYearData(p, y);
+  const crits = yd.performanceCriteria || [];
+  document.getElementById('perf-crit-year-badge').textContent = y + '년';
+
+  if (!crits.length) {
+    document.getElementById('perf-crit-content').innerHTML =
+      `<div class="empty-state"><i class="bi bi-list-check"></i>${y}년 실적 기준이 없습니다.<br>기준 추가 또는 이전 연도에서 복사해서 시작하세요.</div>`;
+    return;
+  }
+
+  document.getElementById('perf-crit-content').innerHTML = `
+    <div class="table-responsive">
+    <table class="table tbl table-hover align-middle">
+      <thead class="table-light">
+        <tr><th>기준명</th><th>유형</th><th>단위/구성</th><th class="text-end">연간 목표</th><th></th></tr>
+      </thead><tbody>
+        ${crits.map(c => {
+          const isTable = c.type === 'table';
+          const typeB = isTable
+            ? `<span class="type-badge-table">테이블형</span>`
+            : `<span class="type-badge-simple">단순형</span>`;
+          const info = isTable
+            ? `<span class="text-muted small">${(c.rows||[]).length}행 × ${(c.cols||[]).length}열</span>`
+            : `<span class="text-muted">${c.unit || ''}</span>`;
+          return `<tr>
+            <td class="fw-semibold">${c.name}</td>
+            <td>${typeB}</td>
+            <td>${info}</td>
+            <td class="text-end">${c.target ? fmtNum(c.target) : '-'}</td>
+            <td class="text-nowrap">
+              <button class="btn btn-link btn-sm text-secondary p-0" onclick="moveCrit('${c.id}',-1)" title="위로"><i class="bi bi-chevron-up"></i></button>
+              <button class="btn btn-link btn-sm text-secondary p-0" onclick="moveCrit('${c.id}',1)" title="아래로"><i class="bi bi-chevron-down"></i></button>
+              <button class="btn btn-link btn-sm text-secondary p-0 ms-1" onclick="openCritModal('${c.id}')"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-link btn-sm text-danger p-0" onclick="delCrit('${c.id}')"><i class="bi bi-trash"></i></button>
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table></div>`;
+}
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.proj-tab').forEach(t => t.style.display = 'none');
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).style.display = 'block';
+  btn.classList.add('active');
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  추경 관리
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function renderBudgetAmendTab() {
+  const p = getProj(); if (!p) return;
+  const y = D.settings.activeYear;
+  const yd = getYearData(p, y);
+  const amendments = yd.budgetAmendments || [];
+  const cats = yd.budgetCategories || [];
+  const el = document.getElementById('budget-amend-content');
+  if (!el) return;
+
+  if (!amendments.length) {
+    el.innerHTML = `<div class="empty-state"><i class="bi bi-clipboard-check"></i>추경 이력이 없습니다.<br><span style="font-size:.82rem">추경이 발생하면 위 버튼으로 기록하세요.</span></div>`;
+    return;
+  }
+
+  // 과목별로 그룹핑해서 표시
+  const catIds = [...new Set(amendments.map(a => a.catId))];
+  let html = '';
+
+  catIds.forEach(catId => {
+    const cat = cats.find(c => c.id === catId);
+    const catName = cat ? cat.name : '(삭제된 과목)';
+    const catAmends = amendments.filter(a => a.catId === catId);
+
+    let rows = `<tr>
+      <td class="text-center"><span class="badge bg-secondary">본예산</span></td>
+      <td class="text-center text-muted">—</td>
+      <td class="text-end fw-semibold">₩${fmt(catAmends[0].prevAmount)}</td>
+      <td class="text-end">—</td>
+      <td></td>
+    </tr>`;
+
+    catAmends.forEach((a, i) => {
+      const diff = a.newAmount - a.prevAmount;
+      const diffStr = diff >= 0
+        ? `<span class="text-danger">+₩${fmt(diff)}</span>`
+        : `<span class="text-primary">-₩${fmt(Math.abs(diff))}</span>`;
+      rows += `<tr>
+        <td class="text-center"><span class="badge" style="background:var(--accent)">${i+1}차 추경</span></td>
+        <td class="text-center text-muted" style="font-size:.82rem">${a.date || '—'}</td>
+        <td class="text-end">₩${fmt(a.prevAmount)}</td>
+        <td class="text-end fw-semibold">₩${fmt(a.newAmount)}<br><small>${diffStr}</small></td>
+        <td class="text-center">
+          <button class="btn btn-link btn-sm p-0 text-danger" onclick="delAmend('${a.id}')" title="삭제"><i class="bi bi-trash" style="font-size:.75rem"></i></button>
+        </td>
+      </tr>`;
+    });
+
+    html += `<div class="mb-4">
+      <div class="fw-semibold mb-2" style="font-size:.88rem;color:#444">
+        <i class="bi bi-tag me-1" style="color:var(--accent)"></i>${escHtml(catName)}
+      </div>
+      <div class="table-responsive"><table class="table tbl table-hover mb-0">
+        <thead><tr><th>구분</th><th>일자</th><th>기존 예산</th><th>수정 예산</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+    </div>`;
+  });
+
+  el.innerHTML = html;
+}
+
+function openAmendModal() {
+  const p = getProj(); if (!p) return;
+  const y = D.settings.activeYear;
+  const yd = getYearData(p, y);
+  const cats = yd.budgetCategories || [];
+
+  // 과목 드롭다운 채우기
+  const catSel = document.getElementById('amend-cat');
+  catSel.innerHTML = `<option value="">— 선택 —</option>` +
+    cats.map(c => `<option value="${c.id}">${escHtml(shortCatName(c.name))}</option>`).join('');
+
+  document.getElementById('mAmendTitle').textContent = '추경 추가';
+  document.getElementById('amend-id').value = '';
+  document.getElementById('amend-item-id').value = '';
+  document.getElementById('amend-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('amend-prev').value = '';
+  document.getElementById('amend-new').value = '';
+  document.getElementById('amend-diff').textContent = '';
+
+  new bootstrap.Modal(document.getElementById('mAmend')).show();
+}
+
+function onAmendCatChange() {
+  const p = getProj(); if (!p) return;
+  const y = D.settings.activeYear;
+  const yd = getYearData(p, y);
+  const catId = document.getElementById('amend-cat').value;
+  const cat = (yd.budgetCategories || []).find(c => c.id === catId);
+  if (!cat) { document.getElementById('amend-prev').value = ''; return; }
+  // 현재 그 과목의 예산을 기존 예산으로 세팅
+  document.getElementById('amend-prev').value = cat.budget || 0;
+  document.getElementById('amend-new').value = '';
+  document.getElementById('amend-diff').textContent = '';
+}
+
+function updateAmendDiff() {
+  const prev = parseFloat(document.getElementById('amend-prev').value) || 0;
+  const next = parseFloat(document.getElementById('amend-new').value) || 0;
+  const diff = next - prev;
+  const el = document.getElementById('amend-diff');
+  if (!document.getElementById('amend-new').value) { el.textContent = ''; return; }
+  if (diff > 0) el.innerHTML = `<span class="text-danger">▲ +₩${fmt(diff)} 증액</span>`;
+  else if (diff < 0) el.innerHTML = `<span class="text-primary">▼ -₩${fmt(Math.abs(diff))} 감액</span>`;
+  else el.innerHTML = `<span class="text-muted">변동 없음</span>`;
+}
+
+function saveAmend() {
+  const p = getProj(); if (!p) return;
+  const y = D.settings.activeYear;
+  const yd = getYearData(p, y);
+  if (!yd.budgetAmendments) yd.budgetAmendments = [];
+
+  const catId  = document.getElementById('amend-cat').value;
+  const date   = document.getElementById('amend-date').value;
+  const prev   = parseFloat(document.getElementById('amend-prev').value) || 0;
+  const newAmt = parseFloat(document.getElementById('amend-new').value);
+
+  if (!catId)        { alert('예산 과목을 선택하세요.'); return; }
+  if (!date)         { alert('일자를 입력하세요.'); return; }
+  if (isNaN(newAmt)) { alert('수정 예산을 입력하세요.'); return; }
+
+  const cat = (yd.budgetCategories || []).find(c => c.id === catId);
+  if (!cat) { alert('예산 과목을 찾을 수 없습니다.'); return; }
+
+  // 이 과목의 기존 추경 횟수 → 라벨 결정
+  const catAmendCount = yd.budgetAmendments.filter(a => a.catId === catId).length;
+  const label = `${catAmendCount + 1}차 추경`;
+  const diff  = newAmt - prev;
+
+  // 예산 항목에 자동 추가
+  if (!cat.items) cat.items = [];
+  const itemId = uid();
+  cat.items.push({ id: itemId, name: label, budget: diff });
+
+  // 과목 예산 업데이트
+  cat.budget = newAmt;
+
+  // 추경 이력 저장
+  yd.budgetAmendments.push({ id: uid(), catId, date, prevAmount: prev, newAmount: newAmt, itemId });
+
+  // totalBudget 재계산
+  yd.totalBudget = (yd.budgetCategories || []).reduce((s, c) => s + (c.budget || 0), 0);
+
+  save();
+  bootstrap.Modal.getInstance(document.getElementById('mAmend')).hide();
+  renderDetail();
+}
+
+function delAmend(amendId) {
+  if (!confirm('이 추경 이력을 삭제할까요?\n예산 항목에서 자동 추가된 항목도 함께 제거됩니다.')) return;
+  const p = getProj(); if (!p) return;
+  const y = D.settings.activeYear;
+  const yd = getYearData(p, y);
+
+  const a = (yd.budgetAmendments || []).find(x => x.id === amendId);
+  if (a) {
+    const cat = (yd.budgetCategories || []).find(c => c.id === a.catId);
+    if (cat) {
+      // 자동 추가된 항목 제거
+      if (a.itemId) cat.items = (cat.items || []).filter(it => it.id !== a.itemId);
+      // 과목 예산을 이전 금액으로 복원
+      cat.budget = a.prevAmount;
+    }
+  }
+
+  yd.budgetAmendments = (yd.budgetAmendments || []).filter(x => x.id !== amendId);
+  // totalBudget 재계산
+  yd.totalBudget = (yd.budgetCategories || []).reduce((s, c) => s + (c.budget || 0), 0);
+
+  save(); renderDetail();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  SETTINGS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  담당자 콤보 헬퍼
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function onMgrSelChange(prefix) {
+  const sel = document.getElementById(prefix + '-sel');
+  const txt = document.getElementById(prefix + '-txt');
+  if (!sel || !txt) return;
+  const isCustom = sel.value === '__custom__';
+  txt.style.display = isCustom ? '' : 'none';
+  if (!isCustom) txt.value = '';
+}
+
+function setMgrCombo(prefix, members, value) {
+  const sel = document.getElementById(prefix + '-sel');
+  const txt = document.getElementById(prefix + '-txt');
+  if (!sel || !txt) return;
+  sel.innerHTML = '<option value="">선택</option>' +
+    members.map(m => `<option value="${escHtml(m)}">${escHtml(m)}</option>`).join('') +
+    '<option value="__custom__">직접 입력</option>';
+  if (!value) {
+    sel.value = '';
+    txt.style.display = 'none';
+  } else if (members.includes(value)) {
+    sel.value = value;
+    txt.style.display = 'none';
+  } else {
+    sel.value = '__custom__';
+    txt.value = value;
+    txt.style.display = '';
+  }
+}
+
+function getMgrComboValue(prefix) {
+  const sel = document.getElementById(prefix + '-sel');
+  const txt = document.getElementById(prefix + '-txt');
+  if (!sel) return '';
+  return sel.value === '__custom__' ? (txt ? txt.value.trim() : '') : sel.value;
+}
+
+function getAllMembers() {
+  return (D.settings.members || []).filter(m => m.active !== false).map(m => m.name);
+}
+
+function getProjMgrList(proj) {
+  const names = [];
+  if (proj?.mainMgr) names.push(proj.mainMgr);
+  if (proj?.subMgr)  names.push(proj.subMgr);
+  return names;
+}
+
+function projMgrDisplay(p) {
+  const main = p.mainMgr || p.mgr || '';
+  const sub  = p.subMgr || '';
+  if (main && sub) return main + ', ' + sub;
+  return main || sub;
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  팀원 관리
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function renderMemberList() {
+  if (!D.settings.members) D.settings.members = [];
+  const el = document.getElementById('s-member-list');
+  if (!el) return;
+  const members = D.settings.members;
+  if (!members.length) {
+    el.innerHTML = '<p class="text-muted small">등록된 팀원이 없습니다.</p>';
+    return;
+  }
+  el.innerHTML = '<div class="d-flex flex-wrap gap-2">' +
+    members.map(m => {
+      const active = m.active !== false;
+      const bg     = active ? '#f0f4ff' : '#f5f5f5';
+      const color  = active ? '#3a4a8a' : '#aaa';
+      const border = active ? '#cdd8ff' : '#ddd';
+      const toggleIcon = active ? 'bi-toggle-on' : 'bi-toggle-off';
+      const toggleTitle = active ? '비활성화' : '다시 활성화';
+      return `<div class="d-flex align-items-center gap-1 px-3 py-1" style="background:${bg};color:${color};font-size:.88rem;font-weight:500;border:1px solid ${border};border-radius:20px">
+        <span>${escHtml(m.name)}</span>
+        ${!active ? '<span class="ms-1" style="font-size:.7rem;opacity:.7">(비활성)</span>' : ''}
+        <i class="bi ${toggleIcon} ms-1" style="cursor:pointer;font-size:.85rem;opacity:.7" onclick="toggleMember('${m.id}')" title="${toggleTitle}"></i>
+        <i class="bi bi-pencil ms-1" style="cursor:pointer;font-size:.7rem;opacity:.5" onclick="editMember('${m.id}')" title="수정"></i>
+        <i class="bi bi-x-lg ms-1" style="cursor:pointer;font-size:.7rem;opacity:.5" onclick="delMember('${m.id}')" title="삭제"></i>
+      </div>`;
+    }).join('') +
+  '</div>';
+}
+
+function openMemberForm(id) {
+  const form = document.getElementById('s-member-form');
+  form.style.display = '';
+  if (id) {
+    const m = (D.settings.members || []).find(x => x.id === id);
+    document.getElementById('s-member-id').value = m?.id || '';
+    document.getElementById('s-member-name').value = m?.name || '';
+  } else {
+    document.getElementById('s-member-id').value = '';
+    document.getElementById('s-member-name').value = '';
+  }
+  document.getElementById('s-member-name').focus();
+}
+
+function closeMemberForm() {
+  document.getElementById('s-member-form').style.display = 'none';
+}
+
+function saveMember() {
+  const name = document.getElementById('s-member-name').value.trim();
+  if (!name) { alert('이름을 입력하세요.'); return; }
+  const id = document.getElementById('s-member-id').value;
+  if (!D.settings.members) D.settings.members = [];
+  if (id) {
+    const m = D.settings.members.find(x => x.id === id);
+    if (m) m.name = name;
+  } else {
+    if (D.settings.members.some(m => m.name === name)) {
+      alert('이미 등록된 팀원입니다.'); return;
+    }
+    D.settings.members.push({ id: uid(), name });
+  }
+  save();
+  closeMemberForm();
+  renderMemberList();
+}
+
+function editMember(id) {
+  openMemberForm(id);
+}
+
+async function changePw() {
+  const cur     = document.getElementById('s-pw-cur').value;
+  const nw      = document.getElementById('s-pw-new').value;
+  const confirm = document.getElementById('s-pw-confirm').value;
+  const msgEl   = document.getElementById('s-pw-msg');
+  msgEl.textContent = '';
+  msgEl.style.color = '#dc3545';
+
+  if (!cur || !nw || !confirm) { msgEl.textContent = '모든 칸을 입력하세요.'; return; }
+  if (nw.length < 6)            { msgEl.textContent = '새 비밀번호는 6자 이상이어야 합니다.'; return; }
+  if (nw !== confirm)           { msgEl.textContent = '새 비밀번호가 일치하지 않습니다.'; return; }
+
+  const curHash = await hashStr(cur);
+  if (curHash !== getPwHash()) { msgEl.textContent = '현재 비밀번호가 올바르지 않습니다.'; return; }
+
+  const newHash = await hashStr(nw);
+  localStorage.setItem(PW_HASH_KEY, newHash);
+  document.getElementById('s-pw-cur').value = '';
+  document.getElementById('s-pw-new').value = '';
+  document.getElementById('s-pw-confirm').value = '';
+  msgEl.style.color = '#198754';
+  msgEl.textContent = '✅ 비밀번호가 변경되었습니다.';
+  setTimeout(() => { msgEl.textContent = ''; }, 3000);
+}
+
+function logout() {
+  localStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(SESSION_KEY);
+  location.reload();
+}
+
+function toggleMember(id) {
+  const m = (D.settings.members || []).find(x => x.id === id);
+  if (!m) return;
+  m.active = m.active === false ? true : false;
+  save();
+  renderMemberList();
+}
+
+function delMember(id) {
+  if (!confirm('팀원을 삭제하시겠습니까?')) return;
+  D.settings.members = (D.settings.members || []).filter(m => m.id !== id);
+  save();
+  renderMemberList();
+}
+
+function renderSettings() {
+  document.getElementById('s-org').value = D.settings.org || '';
+  renderYearList();
+  renderMemberList();
+  const el = document.getElementById('s-proj-list');
+  if (!D.projects.length) { el.innerHTML = '<p class="text-muted small">등록된 사업이 없습니다.</p>'; return; }
+  el.innerHTML = `<div class="table-responsive">
+    <table class="table tbl table-hover">
+      <thead class="table-light">
+        <tr><th>사업명</th><th>주/부 담당자</th><th>시작일</th><th>종료일</th><th></th></tr>
+      </thead><tbody>
+        ${D.projects.map(p => `<tr>
+          <td><span class="proj-dot" style="background:${p.color||'#4f6ef7'}"></span> ${p.name}</td>
+          <td>${projMgrDisplay(p)||'-'}</td><td>${p.startDate||'-'}</td><td>${p.endDate||'-'}</td>
+          <td>
+            <button class="btn btn-sm btn-outline-secondary me-1" onclick="openProjectModal('${p.id}')">수정</button>
+            <button class="btn btn-sm btn-outline-danger" onclick="delProj('${p.id}')">삭제</button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+}
+
+function saveSettings() {
+  D.settings.org = document.getElementById('s-org').value.trim() || '사업 관리 시스템';
+  save();
+  document.getElementById('brand-name').textContent = D.settings.org;
+  alert('설정이 저장되었습니다.');
+}
+
+function renderYearList() {
+  const el = document.getElementById('s-year-list');
+  if (!el) return;
+  if (!D.settings.years || !D.settings.years.length) {
+    D.settings.years = [D.settings.activeYear || THIS_YEAR];
+  }
+  const years = [...new Set(D.settings.years)].sort((a,b) => b-a);
+  const active = D.settings.activeYear;
+  el.innerHTML = `<div class="table-responsive">
+    <table class="table table-sm tbl">
+      <thead class="table-light"><tr><th>연도</th><th>상태</th><th></th></tr></thead>
+      <tbody>
+        ${years.map(y => `<tr>
+          <td class="fw-semibold">${y}년</td>
+          <td>${y === active
+            ? '<span class="badge bg-primary">현재 선택</span>'
+            : `<button class="btn btn-outline-secondary btn-sm py-0" onclick="changeYear(${y});document.getElementById('yearSelect').value=${y}">선택</button>`}
+          </td>
+          <td>${years.length > 1 && y !== active
+            ? `<button class="btn btn-outline-danger btn-sm py-0" onclick="delYear(${y})"><i class="bi bi-trash"></i></button>`
+            : ''}
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function openAddYearForm() {
+  if (!D.settings.years || !D.settings.years.length) D.settings.years = [D.settings.activeYear || THIS_YEAR];
+  const years = [...new Set(D.settings.years)].sort((a,b) => b-a);
+  const nextYear = years[0] + 1;
+  document.getElementById('s-new-year').value = nextYear;
+  const copyFrom = document.getElementById('s-copy-from');
+  copyFrom.innerHTML = '<option value="">복사 안 함</option>' +
+    years.map(y => `<option value="${y}">${y}년에서 복사</option>`).join('');
+  copyFrom.value = years[0]; // 가장 최근 연도를 기본 선택
+  document.getElementById('s-year-form').style.display = '';
+}
+
+function closeAddYearForm() {
+  document.getElementById('s-year-form').style.display = 'none';
+}
+
+function addYear() {
+  const yr = parseInt(document.getElementById('s-new-year').value);
+  if (!yr || yr < 2000 || yr > 2100) { alert('올바른 연도를 입력해주세요.'); return; }
+  if (!D.settings.years) D.settings.years = [D.settings.activeYear || THIS_YEAR];
+  if (D.settings.years.includes(yr)) { alert(yr + '년은 이미 있습니다.'); return; }
+
+  const copyFromYr = parseInt(document.getElementById('s-copy-from').value);
+  if (copyFromYr) {
+    D.projects.forEach(p => {
+      const prev = p.yearData?.[copyFromYr];
+      if (prev) {
+        const newYD = getYearData(p, yr);
+        newYD.budgetCategories = (prev.budgetCategories || []).map(c =>
+          ({ id: uid(), name: c.name, budget: c.budget, isMainBudget: c.isMainBudget }));
+        newYD.performanceCriteria = (prev.performanceCriteria || []).map(c => {
+          const base = { id: uid(), name: c.name, unit: c.unit||'', target: c.target||0, type: c.type||'simple' };
+          if (c.type === 'table') { base.rows = c.rows; base.cols = c.cols; }
+          return base;
+        });
+        newYD.totalBudget = prev.totalBudget || 0;
+      }
+    });
+  }
+
+  D.settings.years.push(yr);
+  D.settings.activeYear = yr;
+  save();
+  buildYearSelector();
+  closeAddYearForm();
+  renderYearList();
+  alert(yr + '년이 추가됐습니다.' + (copyFromYr ? (' ' + copyFromYr + '년 항목을 복사했어요.') : ''));
+}
+
+function delYear(yr) {
+  if (!confirm(yr + '년을 목록에서 삭제하시겠습니까? (입력된 실적·지출 데이터는 보존됩니다)')) return;
+  D.settings.years = (D.settings.years || []).filter(y => y !== yr);
+  save();
+  buildYearSelector();
+  renderYearList();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  PROJECT CRUD
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function openProjectModal(id) {
+  const p = id ? D.projects.find(x => x.id === id) : null;
+  const y = D.settings.activeYear;
+  const yd = p ? getYearData(p, y) : null;
+  document.getElementById('p-id').value     = p?.id || '';
+  document.getElementById('p-name').value   = p?.name || '';
+  document.getElementById('p-docnum').value = yd?.docNumber || '';
+  const allMems = getAllMembers();
+  setMgrCombo('p-main-mgr', allMems, p?.mainMgr || p?.mgr || '');
+  setMgrCombo('p-sub-mgr',  allMems, p?.subMgr || '');
+  document.getElementById('p-start').value  = p?.startDate || '';
+  document.getElementById('p-end').value    = p?.endDate || '';
+  document.getElementById('p-color').value  = p?.color || '#4f6ef7';
+  document.getElementById('p-desc').value   = p?.desc || '';
+  document.getElementById('mProjTitle').textContent = p ? '사업 수정' : '사업 추가';
+  // 예산 과목 로드
+  const cats = yd?.budgetCategories || [];
+  const container = document.getElementById('p-budget-items');
+  container.innerHTML = '';
+  if (cats.length) {
+    cats.forEach(c => addBudgetItem(c.name, c.budget));
+  } else {
+    addBudgetItem();
+  }
+  updateBudgetTotal();
+  new bootstrap.Modal(document.getElementById('mProject')).show();
+}
+
+function addBudgetItem(name = '', amount = '') {
+  const container = document.getElementById('p-budget-items');
+  const row = document.createElement('div');
+  row.className = 'input-group input-group-sm mb-1';
+  row.innerHTML = `
+    <input type="text" class="form-control p-budget-cat-name" lang="ko" placeholder="예산 과목명" value="${name}">
+    <input type="number" class="form-control p-budget-cat-amt" placeholder="금액" value="${amount}" oninput="updateBudgetTotal()" style="max-width:140px">
+    <button class="btn btn-outline-danger" type="button" onclick="this.closest('.input-group').remove();updateBudgetTotal()">
+      <i class="bi bi-x"></i>
+    </button>`;
+  container.appendChild(row);
+}
+
+function updateBudgetTotal() {
+  const amts = document.querySelectorAll('.p-budget-cat-amt');
+  const total = Array.from(amts).reduce((s, el) => s + (parseFloat(el.value) || 0), 0);
+  const el = document.getElementById('p-budget-total');
+  if (el) el.textContent = total > 0 ? '합계 ₩' + fmt(total) : '';
+}
+
+function saveProject() {
+  const name = document.getElementById('p-name').value.trim();
+  if (!name) { alert('사업명을 입력하세요.'); return; }
+  const id = document.getElementById('p-id').value;
+  const y  = D.settings.activeYear;
+  // 예산 과목 수집
+  const catRows = document.querySelectorAll('#p-budget-items .input-group');
+  const cats = [];
+  catRows.forEach(row => {
+    const catName = row.querySelector('.p-budget-cat-name')?.value.trim();
+    const catAmt  = parseFloat(row.querySelector('.p-budget-cat-amt')?.value) || 0;
+    if (catName) cats.push({ id: uid(), name: catName, budget: catAmt, isMainBudget: true });
+  });
+  const totalBudget = cats.reduce((s, c) => s + c.budget, 0);
+  const docNumber = document.getElementById('p-docnum').value.trim();
+
+  if (id) {
+    const p = D.projects.find(x => x.id === id);
+    if (p) {
+      p.name = name;
+      p.mainMgr = getMgrComboValue('p-main-mgr');
+      p.subMgr  = getMgrComboValue('p-sub-mgr');
+      p.mgr = projMgrDisplay(p);
+      p.startDate = document.getElementById('p-start').value;
+      p.endDate = document.getElementById('p-end').value;
+      p.color = document.getElementById('p-color').value;
+      p.desc = document.getElementById('p-desc').value;
+      const yd = getYearData(p, y);
+      if (cats.length) {
+        yd.budgetCategories = cats;
+        yd.totalBudget = totalBudget;
+      } else {
+        // 모달에 예산 입력이 없으면 기존 카테고리 합산값 유지
+        yd.totalBudget = (yd.budgetCategories || []).reduce((s, c) => s + (c.budget || 0), 0);
+      }
+      yd.docNumber = docNumber;
+    }
+  } else {
+    const mainMgr = getMgrComboValue('p-main-mgr');
+    const subMgr  = getMgrComboValue('p-sub-mgr');
+    const np = { id: uid(), name, mainMgr, subMgr, mgr: [mainMgr,subMgr].filter(Boolean).join(', '),
+      startDate: document.getElementById('p-start').value, endDate: document.getElementById('p-end').value,
+      color: document.getElementById('p-color').value, desc: document.getElementById('p-desc').value,
+      yearData: {}, expenses: [], performanceRecords: [] };
+    const yd = getYearData(np, y);
+    yd.totalBudget = totalBudget;
+    yd.docNumber = docNumber;
+    if (cats.length) yd.budgetCategories = cats;
+    D.projects.push(np);
+  }
+  save(); bootstrap.Modal.getInstance(document.getElementById('mProject')).hide();
+  rebuildProjNav(); renderProjects(); renderSettings();
+}
+
+function editCurrentProject() { openProjectModal(curProjId); }
+function deleteCurrentProject() {
+  if (!confirm('이 사업을 삭제하시겠습니까? 모든 연도 데이터가 삭제됩니다.')) return;
+  delProj(curProjId);
+}
+function delProj(id) {
+  if (!confirm('이 사업을 삭제하시겠습니까?')) return;
+  D.projects = D.projects.filter(p => p.id !== id);
+  save(); rebuildProjNav(); go('projects');
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  EXPENSE CRUD
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function openExpenseModal(id) {
+  const p = getProj(); if (!p) return;
+  const y  = D.settings.activeYear;
+  const yd = getYearData(p, y);
+  const e  = id ? (p.expenses || []).find(x => x.id === id) : null;
+  document.getElementById('e-id').value     = e?.id || '';
+  document.getElementById('e-date').value   = e?.date || (y + '-' + String(new Date().getMonth()+1).padStart(2,'0') + '-' + String(new Date().getDate()).padStart(2,'0'));
+  document.getElementById('e-amount').value = e?.amount || '';
+  document.getElementById('e-desc').value   = e?.desc || '';
+  document.getElementById('e-target').value = e?.target || '';
+  setMgrCombo('e-mgr', getProjMgrList(p), e?.mgr || p.mainMgr || p.mgr || '');
+  document.getElementById('e-note').value   = e?.note || '';
+  // 예산 과목 – 마지막 선택값 또는 첫 번째 항목을 기본값으로
+  const defaultCatId = e?.catId || p.lastCatId || (yd.budgetCategories?.[0]?.id || '');
+  const catSel = document.getElementById('e-cat');
+  catSel.innerHTML = '<option value="">선택</option>' +
+    (yd.budgetCategories || []).map(c =>
+      `<option value="${c.id}" ${defaultCatId === c.id ? 'selected' : ''}>${shortCatName(c.name)}</option>`
+    ).join('');
+  // 예산 항목 – 선택된 과목의 세부 항목
+  populateExpItems(defaultCatId, e?.itemId || '');
+  new bootstrap.Modal(document.getElementById('mExpense')).show();
+}
+
+function saveExpense() {
+  const date   = document.getElementById('e-date').value;
+  const amount = parseFloat(document.getElementById('e-amount').value);
+  const desc   = document.getElementById('e-desc').value.trim();
+  if (!date || !amount || !desc) { alert('날짜, 금액, 내용은 필수입니다.'); return; }
+  const p = getProj(); if (!p) return;
+  if (!p.expenses) p.expenses = [];
+  const id     = document.getElementById('e-id').value;
+  const catId  = document.getElementById('e-cat').value;
+  const itemId = document.getElementById('e-item').value;
+  if (catId) p.lastCatId = catId;
+  const expYear = new Date(date).getFullYear();
+  const obj = { id: id || uid(), date, year: expYear, month: new Date(date).getMonth() + 1,
+    amount, desc, target: document.getElementById('e-target').value,
+    catId, itemId,
+    mgr: getMgrComboValue('e-mgr'), note: document.getElementById('e-note').value };
+  if (id) { const i = p.expenses.findIndex(x => x.id === id); if (i >= 0) p.expenses[i] = obj; }
+  else p.expenses.push(obj);
+  save(); bootstrap.Modal.getInstance(document.getElementById('mExpense')).hide();
+  renderDetail();
+}
+
+function delExpense(id) {
+  if (!confirm('삭제하시겠습니까?')) return;
+  const p = getProj(); if (!p) return;
+  p.expenses = (p.expenses || []).filter(e => e.id !== id);
+  save(); renderDetail();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  BUDGET CATEGORY CRUD  (연도별)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function openCatModal(id) {
+  const p = getProj(); if (!p) return;
+  const yd = getYearData(p);
+  const c  = id ? (yd.budgetCategories || []).find(x => x.id === id) : null;
+  document.getElementById('c-id').value     = c?.id || '';
+  document.getElementById('c-name').value   = c?.name || '';
+  document.getElementById('c-budget').value = c?.budget || '';
+  document.getElementById('mCatTitle').textContent = c ? '예산 과목 수정' : '예산 과목 추가';
+  new bootstrap.Modal(document.getElementById('mCat')).show();
+}
+
+function saveCat() {
+  const name = document.getElementById('c-name').value.trim();
+  if (!name) { alert('항목명을 입력하세요.'); return; }
+  const p = getProj(); if (!p) return;
+  const yd = getYearData(p);
+  if (!yd.budgetCategories) yd.budgetCategories = [];
+  const id  = document.getElementById('c-id').value;
+  const budget = parseFloat(document.getElementById('c-budget').value) || 0;
+  if (id) {
+    const i = yd.budgetCategories.findIndex(x => x.id === id);
+    if (i >= 0) yd.budgetCategories[i] = { ...yd.budgetCategories[i], name, budget };
+  } else {
+    yd.budgetCategories.push({ id: uid(), name, budget, isMainBudget: true, items: [] });
+  }
+  yd.totalBudget = yd.budgetCategories.reduce((s, c) => s + (c.budget || 0), 0);
+  save(); bootstrap.Modal.getInstance(document.getElementById('mCat')).hide(); renderDetail();
+}
+
+function delCat(id) {
+  if (!confirm('항목을 삭제하시겠습니까?')) return;
+  const p = getProj(); if (!p) return;
+  const yd = getYearData(p);
+  yd.budgetCategories = (yd.budgetCategories || []).filter(c => c.id !== id);
+  yd.totalBudget = yd.budgetCategories.reduce((s, c) => s + (c.budget || 0), 0);
+  save(); renderDetail();
+}
+
+// ── 예산 항목(세부) CRUD ──
+function openItemModal(catId, itemId) {
+  const p = getProj(); if (!p) return;
+  const yd = getYearData(p);
+  const cat = (yd.budgetCategories || []).find(c => c.id === catId);
+  if (!cat) return;
+  const item = itemId ? (cat.items || []).find(it => it.id === itemId) : null;
+  document.getElementById('it-cat-id').value  = catId;
+  document.getElementById('it-id').value      = item?.id || '';
+  document.getElementById('it-name').value    = item?.name || '';
+  document.getElementById('it-budget').value  = item?.budget || '';
+  document.getElementById('mItemTitle').textContent = item ? '예산 항목 수정' : '예산 항목 추가';
+  new bootstrap.Modal(document.getElementById('mItem')).show();
+}
+
+function saveItem() {
+  const name = document.getElementById('it-name').value.trim();
+  if (!name) { alert('항목명을 입력하세요.'); return; }
+  const p = getProj(); if (!p) return;
+  const yd = getYearData(p);
+  const catId = document.getElementById('it-cat-id').value;
+  const cat = (yd.budgetCategories || []).find(c => c.id === catId);
+  if (!cat) return;
+  if (!cat.items) cat.items = [];
+  const id  = document.getElementById('it-id').value;
+  const obj = { id: id || uid(), name, budget: parseFloat(document.getElementById('it-budget').value) || 0 };
+  if (id) { const i = cat.items.findIndex(x => x.id === id); if (i >= 0) cat.items[i] = obj; }
+  else cat.items.push(obj);
+  save(); bootstrap.Modal.getInstance(document.getElementById('mItem')).hide(); renderDetail();
+}
+
+function delCatItem(catId, itemId) {
+  if (!confirm('항목을 삭제하시겠습니까?')) return;
+  const p = getProj(); if (!p) return;
+  const yd = getYearData(p);
+  const cat = (yd.budgetCategories || []).find(c => c.id === catId);
+  if (!cat) return;
+  cat.items = (cat.items || []).filter(it => it.id !== itemId);
+  save(); renderDetail();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  PERFORMANCE CRITERIA CRUD  (연도별)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function onCritTypeChange() {
+  const isTable = document.querySelector('input[name="cr-type"]:checked').value === 'table';
+  document.getElementById('cr-simple-fields').style.display = isTable ? 'none' : '';
+  document.getElementById('cr-table-fields').style.display  = isTable ? '' : 'none';
+}
+
+// 열 정의 파싱: "출장 및 조건만남형=출장+조건만남" → {name, type:'formula', formula:'출장+조건만남'}
+function parseColDefs(text) {
+  return text.split('\n').map(s => s.trim()).filter(Boolean).map(line => {
+    const eqIdx = line.indexOf('=');
+    if (eqIdx > 0) {
+      return { name: line.slice(0, eqIdx).trim(), type: 'formula', formula: line.slice(eqIdx+1).trim() };
+    }
+    return { name: line, type: 'input' };
+  });
+}
+
+// 수식 계산: "출장+조건만남" → 해당 열 값들의 합
+function evalFormula(formula, rowData) {
+  return formula.split('+').map(s => s.trim()).reduce((sum, col) => sum + (rowData[col] || 0), 0);
+}
+
+// colDefs 배열을 textarea 텍스트로 복원
+function colDefsToText(colDefs) {
+  if (!colDefs || !colDefs.length) return '';
+  // 구버전 호환: string 배열이면 그냥 join
+  if (typeof colDefs[0] === 'string') return colDefs.join('\n');
+  return colDefs.map(c => c.type === 'formula' ? c.name + '=' + c.formula : c.name).join('\n');
+}
+
+// colDefs에서 입력 열만 추출
+function inputCols(colDefs) {
+  if (!colDefs || !colDefs.length) return [];
+  if (typeof colDefs[0] === 'string') return colDefs; // 구버전 호환
+  return colDefs.filter(c => c.type === 'input').map(c => c.name);
+}
+
+// 행 합계 표시값 계산
+// - 텍스트 값이 섞여 있으면 숫자값만 "/" 로 구분해서 반환 (예: "1/230")
+// - 전부 숫자면 합계 반환
+function rowSummaryDisplay(inCols, rowData) {
+  const vals = inCols.map(col => rowData[col]);
+  const hasText = vals.some(v => v !== undefined && v !== '' && v !== null && isNaN(parseFloat(v)));
+  if (hasText) {
+    const nums = vals.filter(v => v !== undefined && v !== '' && v !== null && !isNaN(parseFloat(v)));
+    return nums.length > 0 ? nums.map(v => parseFloat(v)).join('/') : '—';
+  }
+  return inCols.reduce((s, col) => s + (parseFloat(rowData[col]) || 0), 0);
+}
+// ── 예산 과목 단축명 (세목 이후 텍스트만 추출) ──
+function shortCatName(name) {
+  if (!name) return '';
+  const m = name.match(/\(세목\)(.+)/);
+  return m ? m[1].trim() : name;
+}
+
+// ── 숫자 쉼표 포맷 (텍스트·"/" 포함값도 처리) ──
+function fmtNum(v) {
+  if (v === null || v === undefined || v === '' || v === '—') return v;
+  const s = String(v);
+  if (s.includes('/')) {
+    return s.split('/').map(p => {
+      const n = Number(p.trim());
+      return isNaN(n) ? p.trim() : n.toLocaleString('ko-KR');
+    }).join('/');
+  }
+  const n = Number(s);
+  if (!isNaN(n) && s.trim() !== '') return n.toLocaleString('ko-KR');
+  return s;
+}
+
+// ── 지출 모달: 과목 선택 시 항목 목록 갱신 ──
+function populateExpItems(catId, selItemId) {
+  const p = getProj(); if (!p) return;
+  const yd = getYearData(p, D.settings.activeYear);
+  const cat = (yd.budgetCategories || []).find(c => c.id === catId);
+  const items = cat?.items || [];
+  const sel = document.getElementById('e-item');
+  sel.innerHTML = '<option value="">선택</option>' +
+    items.map(it => `<option value="${it.id}" ${selItemId === it.id ? 'selected' : ''}>${it.name}</option>`).join('');
+}
+
+function onExpCatChange() {
+  populateExpItems(document.getElementById('e-cat').value, '');
+}
+
+
+// 전체 열 이름 목록
+function allColNames(colDefs) {
+  if (!colDefs || !colDefs.length) return [];
+  if (typeof colDefs[0] === 'string') return colDefs; // 구버전 호환
+  return colDefs.map(c => c.name);
+}
+
+// 한 행의 전체 값 계산 (수식 포함)
+function computeRowData(colDefs, storedRowData) {
+  const result = { ...storedRowData };
+  if (!colDefs || typeof colDefs[0] === 'string') return result;
+  colDefs.forEach(c => {
+    if (c.type === 'formula') result[c.name] = evalFormula(c.formula, result);
+  });
+  return result;
+}
+
+// ── 실적 기준 멀티 추가 ─────────────────────────
+let _critItemCount = 0;
+
+function createCritItemEl(data) {
+  const idx = _critItemCount++;
+  const isTable = data?.type === 'table';
+  const div = document.createElement('div');
+  div.className = 'cr-item border rounded p-3 mb-2';
+  div.innerHTML = `
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <span class="small fw-semibold text-muted cr-item-label"></span>
+      <button type="button" class="btn btn-sm btn-link text-danger p-0 cr-remove-btn" onclick="removeCritItem(this)" title="이 항목 삭제">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="mb-2">
+      <div class="d-flex gap-3 flex-wrap">
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="cr-type-${idx}" id="cr-ts-${idx}" value="simple" ${!isTable?'checked':''} onchange="onCritItemTypeChange(this)">
+          <label class="form-check-label small" for="cr-ts-${idx}"><strong>단순형</strong> — 월별 숫자 하나</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="cr-type-${idx}" id="cr-tt-${idx}" value="table" ${isTable?'checked':''} onchange="onCritItemTypeChange(this)">
+          <label class="form-check-label small" for="cr-tt-${idx}"><strong>테이블형</strong> — 행×열 매트릭스</label>
+        </div>
+      </div>
+    </div>
+    <div class="row g-2 mb-1">
+      <div class="col-12">
+        <input class="form-control form-control-sm cr-name" lang="ko" placeholder="기준명 *" value="${data?.name||''}">
+      </div>
+    </div>
+    <div class="row g-2 cr-simple-section" style="${isTable?'display:none':''}">
+      <div class="col-sm-6">
+        <input class="form-control form-control-sm cr-unit" lang="ko" placeholder="단위 (예: 건, 명, 회)" value="${data?.unit||''}">
+      </div>
+      <div class="col-sm-6">
+        <input class="form-control form-control-sm cr-target" type="number" placeholder="연간 목표" value="${data?.target??''}">
+      </div>
+      <div class="col-12">
+        <label class="form-label small mb-1">집계 방식</label>
+        <div class="d-flex gap-3">
+          <div class="form-check">
+            <input class="form-check-input cr-aggr" type="radio" name="cr-aggr-${idx}" id="cr-aggr-sum-${idx}" value="sum" ${(data?.aggr||'sum')==='avg'?'':'checked'}>
+            <label class="form-check-label small" for="cr-aggr-sum-${idx}">합계 — 전체 월 합산</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input cr-aggr" type="radio" name="cr-aggr-${idx}" id="cr-aggr-avg-${idx}" value="avg" ${data?.aggr==='avg'?'checked':''}>
+            <label class="form-check-label small" for="cr-aggr-avg-${idx}">평균 — 입력된 월의 평균</label>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cr-table-section" style="${isTable?'':'display:none'}">
+      <div class="alert alert-info small py-1 mb-2 mt-1">
+        <i class="bi bi-info-circle"></i> 행과 열 항목을 한 줄에 하나씩 입력하세요. 합계 열은 자동 계산됩니다.
+      </div>
+      <div class="row g-2">
+        <div class="col-md-4">
+          <label class="form-label small fw-semibold">행 항목 *</label>
+          <textarea class="form-control form-control-sm cr-rows" lang="ko" rows="5"
+            placeholder="구글&#10;네이버&#10;유튜브">${(data?.rows||[]).join('\n')}</textarea>
+        </div>
+        <div class="col-md-8">
+          <label class="form-label small fw-semibold">열 항목 *</label>
+          <textarea class="form-control form-control-sm cr-cols" lang="ko" rows="7"
+            placeholder="출장&#10;조건만남&#10;합계=출장+조건만남">${colDefsToText(data?.cols||[])}</textarea>
+          <div class="form-text small">💡 자동계산 열: <code>열이름=더할열1+더할열2</code></div>
+        </div>
+      </div>
+      <div class="row g-2 mt-2">
+        <div class="col-sm-4">
+          <label class="form-label small">단위</label>
+          <input class="form-control form-control-sm cr-table-unit" lang="ko" placeholder="예: 건, 명" value="${data?.unit||''}">
+        </div>
+        <div class="col-sm-4">
+          <label class="form-label small">연간 목표 (합계 기준)</label>
+          <input class="form-control form-control-sm cr-table-target" type="number" placeholder="0" value="${data?.target??''}">
+        </div>
+        <div class="col-sm-4">
+          <label class="form-label small">전체 현황 표시 방식</label>
+          <select class="form-select form-select-sm cr-dash-mode">
+            <option value="sum"   ${(data?.dashMode||'sum')==='sum'  ?'selected':''}>전체 합산</option>
+            <option value="split" ${data?.dashMode==='split'?'selected':''}>행별 분리</option>
+            <option value="col_split" ${data?.dashMode==='col_split'?'selected':''}>열별 분리</option>
+          </select>
+        </div>
+      </div>
+      <div class="row g-2 mt-1">
+        <div class="col-12">
+          <label class="form-label small mb-1">집계 방식</label>
+          <div class="d-flex gap-3">
+            <div class="form-check">
+              <input class="form-check-input cr-aggr" type="radio" name="cr-aggr-${idx}" id="cr-aggr-sum-${idx}" value="sum" ${(data?.aggr||'sum')==='avg'?'':'checked'}>
+              <label class="form-check-label small" for="cr-aggr-sum-${idx}">합계 — 전체 월 합산</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input cr-aggr" type="radio" name="cr-aggr-${idx}" id="cr-aggr-avg-${idx}" value="avg" ${data?.aggr==='avg'?'checked':''}>
+              <label class="form-check-label small" for="cr-aggr-avg-${idx}">평균 — 입력된 월의 평균</label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  return div;
+}
+
+function onCritItemTypeChange(radio) {
+  const item = radio.closest('.cr-item');
+  const isTable = radio.value === 'table';
+  item.querySelector('.cr-simple-section').style.display = isTable ? 'none' : '';
+  item.querySelector('.cr-table-section').style.display  = isTable ? '' : 'none';
+}
+
+function updateCritItemLabels() {
+  const items = document.querySelectorAll('#cr-items-container .cr-item');
+  items.forEach((item, i) => {
+    const lbl = item.querySelector('.cr-item-label');
+    if (lbl) lbl.textContent = items.length > 1 ? `기준 ${i + 1}` : '';
+    const btn = item.querySelector('.cr-remove-btn');
+    if (btn) btn.style.display = items.length > 1 ? '' : 'none';
+  });
+}
+
+function addCritItem() {
+  const container = document.getElementById('cr-items-container');
+  container.appendChild(createCritItemEl(null));
+  updateCritItemLabels();
+}
+
+function removeCritItem(btn) {
+  const container = document.getElementById('cr-items-container');
+  if (container.children.length <= 1) return;
+  btn.closest('.cr-item').remove();
+  updateCritItemLabels();
+}
+
+function openCritModal(id) {
+  const p = getProj(); if (!p) return;
+  const yd = getYearData(p);
+  const c  = id ? (yd.performanceCriteria || []).find(x => x.id === id) : null;
+  document.getElementById('cr-id').value = c?.id || '';
+  document.getElementById('mCritTitle').textContent = c ? '실적 기준 수정' : '실적 기준 추가';
+  // 수정 모드에서는 + 버튼 숨김
+  document.getElementById('cr-add-item-btn').style.display = c ? 'none' : '';
+  // 아이템 컨테이너 초기화
+  _critItemCount = 0;
+  const container = document.getElementById('cr-items-container');
+  container.innerHTML = '';
+  container.appendChild(createCritItemEl(c || null));
+  updateCritItemLabels();
+  new bootstrap.Modal(document.getElementById('mCrit')).show();
+}
+
+function saveCrit() {
+  const p = getProj(); if (!p) return;
+  const yd = getYearData(p);
+  if (!yd.performanceCriteria) yd.performanceCriteria = [];
+  const editId = document.getElementById('cr-id').value;
+  const items  = document.querySelectorAll('#cr-items-container .cr-item');
+  const toSave = [];
+  for (const item of items) {
+    const name = item.querySelector('.cr-name').value.trim();
+    if (!name) { alert('기준명을 입력하세요.'); item.querySelector('.cr-name').focus(); return; }
+    const isTable = item.querySelector('input[type="radio"][value="table"]').checked;
+    let obj;
+    if (isTable) {
+      const rows = item.querySelector('.cr-rows').value.split('\n').map(s=>s.trim()).filter(Boolean);
+      const cols = parseColDefs(item.querySelector('.cr-cols').value);
+      if (!rows.length || !cols.length) { alert(`[${name}] 행 항목과 열 항목을 모두 입력하세요.`); return; }
+      obj = { id: uid(), name, type: 'table', rows, cols,
+        unit:     item.querySelector('.cr-table-unit')?.value || '',
+        target:   parseFloat(item.querySelector('.cr-table-target')?.value) || 0,
+        dashMode: item.querySelector('.cr-dash-mode')?.value || 'sum',
+        aggr:     item.querySelector('.cr-aggr:checked')?.value || 'sum' };
+    } else {
+      obj = { id: uid(), name, type: 'simple',
+        unit:   item.querySelector('.cr-unit').value,
+        target: parseFloat(item.querySelector('.cr-target').value) || 0,
+        aggr:   item.querySelector('.cr-aggr:checked')?.value || 'sum' };
+    }
+    toSave.push(obj);
+  }
+  if (editId) {
+    // 수정 모드: 기존 항목 교체
+    toSave[0].id = editId;
+    const i = yd.performanceCriteria.findIndex(x => x.id === editId);
+    if (i >= 0) yd.performanceCriteria[i] = toSave[0];
+  } else {
+    // 추가 모드: 전부 저장
+    toSave.forEach(obj => yd.performanceCriteria.push(obj));
+  }
+  save(); bootstrap.Modal.getInstance(document.getElementById('mCrit')).hide(); renderDetail();
+}
+
+function delCrit(id) {
+  if (!confirm('기준을 삭제하시겠습니까?')) return;
+  const p = getProj(); if (!p) return;
+  const yd = getYearData(p);
+  yd.performanceCriteria = (yd.performanceCriteria || []).filter(c => c.id !== id);
+  save(); renderDetail();
+}
+
+function moveCrit(id, dir) {
+  const p = getProj(); if (!p) return;
+  const yd = getYearData(p);
+  const crits = yd.performanceCriteria || [];
+  const idx = crits.findIndex(c => c.id === id);
+  if (idx < 0) return;
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= crits.length) return;
+  [crits[idx], crits[newIdx]] = [crits[newIdx], crits[idx]];
+  save(); renderDetail();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  PERFORMANCE INLINE EDITING
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function savePerfInline(critId, month, input) {
+  const rawVal = input.value.trim();
+  const p = getProj(); if (!p) return;
+  const y = D.settings.activeYear;
+  const yd = getYearData(p, y);
+  if (!p.performanceRecords) p.performanceRecords = [];
+  const existing = p.performanceRecords.find(r => r.critId === critId && r.month === month && r.year === y);
+  if (rawVal === '') {
+    if (existing) p.performanceRecords = p.performanceRecords.filter(r => !(r.critId === critId && r.month === month && r.year === y));
+  } else {
+    const val = parseFloat(rawVal) || 0;
+    if (existing) { existing.val = val; }
+    else { p.performanceRecords.push({ id: uid(), year: y, month, critId, type: 'simple', val, mgr: p.mainMgr || p.mgr || '', note: '' }); }
+  }
+  save();
+  // 합계/평균 DOM 업데이트 (포커스 유지)
+  const recs2 = yearPerfRecs(p, y);
+  const byMo = {};
+  recs2.filter(r => r.critId === critId).forEach(r => { byMo[r.month] = (byMo[r.month] || 0) + r.val; });
+  const total = Object.values(byMo).reduce((s, v) => s + v, 0);
+  const crit2 = (getYearData(p, y).performanceCriteria || []).find(c => c.id === critId);
+  const mwData2 = Object.values(byMo).filter(v => v > 0).length;
+  const displayVal = (crit2?.aggr === 'avg' && mwData2 > 0) ? (total / mwData2) : total;
+  const totEl = document.getElementById(`perf-total-${critId}`);
+  if (totEl) totEl.textContent = displayVal.toLocaleString('ko-KR', {maximumFractionDigits:1});
+}
+
+function recalcTableInline(critId, month, ri) {
+  const p = getProj(); if (!p) return;
+  const yd = getYearData(p);
+  const crit = (yd.performanceCriteria || []).find(c => c.id === critId);
+  if (!crit) return;
+  const colDefs = crit.cols || [];
+  const inputs = document.querySelectorAll(`.tbl-perf-input[data-crit="${critId}"][data-month="${month}"][data-row-i="${ri}"]`);
+  const rowData = {};
+  inputs.forEach(inp => { rowData[inp.dataset.col] = parseFloat(inp.value) || 0; });
+  colDefs.forEach((cd, ci) => {
+    if (typeof cd === 'object' && cd.type === 'formula') {
+      const val = evalFormula(cd.formula, rowData);
+      const el = document.getElementById(`tif-${critId}-${month}-${ri}-${ci}`);
+      if (el) el.textContent = fmtNum(val || 0);
+    }
+  });
+  const inColsList = inputCols(colDefs);
+  const rowTot = rowSummaryDisplay(inColsList, rowData);
+  const rowTotEl = document.getElementById(`tir-${critId}-${month}-${ri}`);
+  if (rowTotEl) rowTotEl.textContent = fmtNum(rowTot);
+}
+
+function savePerfTableInline(critId, month) {
+  const p = getProj(); if (!p) return;
+  const y = D.settings.activeYear;
+  const yd = getYearData(p, y);
+  const crit = (yd.performanceCriteria || []).find(c => c.id === critId);
+  if (!crit) return;
+  if (!p.performanceRecords) p.performanceRecords = [];
+  const inputs = document.querySelectorAll(`.tbl-perf-input[data-crit="${critId}"][data-month="${month}"]`);
+  const tableData = {};
+  inputs.forEach(inp => {
+    const row = crit.rows[parseInt(inp.dataset.rowI)];
+    if (!row) return;
+    if (!tableData[row]) tableData[row] = {};
+    const raw = inp.value.trim();
+    const num = parseFloat(raw);
+    tableData[row][inp.dataset.col] = (raw !== '' && !isNaN(num)) ? num : raw;
+  });
+  const existing = p.performanceRecords.find(r => r.critId === critId && r.month === month && r.year === y);
+  if (existing) { existing.tableData = tableData; }
+  else { p.performanceRecords.push({ id: uid(), year: y, month, critId, type: 'table', tableData, mgr: p.mainMgr || p.mgr || '', note: '' }); }
+  save();
+  perfViewMonth = month;
+  renderDetail();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  PERFORMANCE RECORDS CRUD
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 특정 기준 ID + 월로 모달 열기 (테이블형 "수정" 버튼용)
+function openPerfModalFor(critId, month) {
+  const p = getProj(); if (!p) return;
+  const y  = D.settings.activeYear;
+  const mo = month || perfViewMonth;
+  // 이미 저장된 레코드 찾기
+  const existing = (p.performanceRecords || []).find(r => r.critId === critId && r.month === mo && r.year === y);
+  _openPerfModalInternal(existing?.id, critId, mo);
+}
+
+function openPerfModal(id) {
+  _openPerfModalInternal(id, null, null);
+}
+
+function _openPerfModalInternal(recordId, prefCritId, prefMonth) {
+  const p = getProj(); if (!p) return;
+  const y  = D.settings.activeYear;
+  const yd = getYearData(p, y);
+  const r  = recordId ? (p.performanceRecords || []).find(x => x.id === recordId) : null;
+  const now = new Date().getMonth() + 1;
+  document.getElementById('pf-id').value   = r?.id || '';
+  setMgrCombo('pf-mgr', getProjMgrList(p), r?.mgr || p.mainMgr || p.mgr || '');
+  document.getElementById('pf-note').value = r?.note || '';
+  document.getElementById('pf-val').value  = r?.val || '';
+  const ms = document.getElementById('pf-month');
+  const selMo = r?.month || prefMonth || now;
+  ms.innerHTML = Array.from({length:12}, (_, i) =>
+    `<option value="${i+1}" ${selMo === i+1 ? 'selected' : ''}>${i+1}월</option>`).join('');
+  const selCritId = r?.critId || prefCritId || '';
+  const cs = document.getElementById('pf-crit');
+  cs.innerHTML = '<option value="">기준 선택</option>' +
+    (yd.performanceCriteria || []).map(c => {
+      const label = c.type === 'table' ? `${c.name} [테이블형]` : `${c.name}${c.unit?' ('+c.unit+')':''}`;
+      return `<option value="${c.id}" ${selCritId === c.id ? 'selected' : ''}>${label}</option>`;
+    }).join('');
+  new bootstrap.Modal(document.getElementById('mPerf')).show();
+  // 기준이 선택된 상태라면 UI 갱신
+  if (selCritId) setTimeout(() => onPerfCritChange(r), 50);
+}
+
+function onPerfCritChange(existingRec) {
+  const p = getProj(); if (!p) return;
+  const y  = D.settings.activeYear;
+  const yd = getYearData(p, y);
+  const critId = document.getElementById('pf-crit').value;
+  const month  = parseInt(document.getElementById('pf-month').value);
+  const crit   = (yd.performanceCriteria || []).find(c => c.id === critId);
+  const isTable = crit?.type === 'table';
+
+  document.getElementById('pf-simple-area').style.display = isTable ? 'none' : '';
+  document.getElementById('pf-table-area').style.display  = isTable ? '' : 'none';
+
+  if (isTable && crit) {
+    // 이미 저장된 데이터 찾기
+    const rec = existingRec || (p.performanceRecords || []).find(r => r.critId === critId && r.month === month && r.year === y);
+    const td  = rec?.tableData || {};
+    const rows = crit.rows || [];
+    const colDefs = crit.cols || [];
+    const colNames = allColNames(colDefs);
+
+    let grid = `<table class="table table-sm table-bordered table-entry" style="font-size:.78rem;min-width:600px">
+      <thead class="table-light">
+        <tr><th style="min-width:110px"></th>
+          ${colDefs.map(c => {
+            const isFormula = typeof c === 'object' && c.type === 'formula';
+            return `<th class="text-center${isFormula ? ' table-info' : ''}" style="min-width:70px">${typeof c === 'string' ? c : c.name}${isFormula ? '<br><small class="text-muted" style="font-size:.65rem">자동계산</small>' : ''}</th>`;
+          }).join('')}
+          <th class="text-center table-warning">행 합계</th>
+        </tr>
+      </thead><tbody>`;
+    rows.forEach(row => {
+      const storedRowData = td[row] || {};
+      const computed = computeRowData(colDefs, storedRowData);
+      const rowSumId = 'rsum_' + row.replace(/[^a-z0-9]/gi,'_');
+      // 행 합계: 입력 열만 합산 (수식 열은 제외 — 이미 입력 열 조합이므로 중복 방지)
+      const inCols = inputCols(colDefs);
+      const rowTot = inCols.reduce((s, col) => s + (computed[col] || 0), 0);
+      grid += `<tr><td class="fw-semibold">${row}</td>
+        ${colDefs.map(c => {
+          const isStr     = typeof c === 'string';
+          const colName   = isStr ? c : c.name;
+          const isFormula = !isStr && c.type === 'formula';
+          const val       = computed[colName] || 0;
+          if (isFormula) {
+            return `<td class="text-center bg-light text-primary fw-semibold formula-cell" data-row="${row}" data-col="${colName}" data-formula="${c.formula}">${val}</td>`;
+          } else {
+            return `<td><input type="number" data-row="${row}" data-col="${colName}" value="${val}" min="0" oninput="updateTableRow(this,event)"></td>`;
+          }
+        }).join('')}
+        <td class="text-center fw-bold table-warning row-sum" id="${rowSumId}">${rowTot}</td>
+      </tr>`;
+    });
+    grid += '</tbody></table>';
+    document.getElementById('pf-table-grid').innerHTML = grid;
+  }
+}
+
+// 입력값 변경 시 → 수식 열 & 행 합계 갱신
+function updateTableRow(input, event) {
+  if (event?.isComposing) return;
+  const row     = input.dataset.row;
+  const grid    = document.getElementById('pf-table-grid');
+  // 현재 행의 모든 입력값 수집
+  const rowInputs = grid.querySelectorAll(`input[data-row="${row}"]`);
+  const rowData = {};
+  rowInputs.forEach(inp => {
+    const raw = inp.value.trim();
+    const num = parseFloat(raw);
+    rowData[inp.dataset.col] = (raw !== '' && !isNaN(num)) ? num : raw;
+  });
+
+  // 수식 열 갱신
+  const formulaCells = grid.querySelectorAll(`.formula-cell[data-row="${row}"]`);
+  formulaCells.forEach(cell => {
+    const formula = cell.dataset.formula;
+    const val = formula.split('+').map(s => s.trim()).reduce((s, col) => s + (rowData[col] || 0), 0);
+    cell.textContent = val;
+  });
+
+  // 행 합계 갱신 (입력 열만, 텍스트 혼재 시 "/" 구분)
+  const rowSumId = 'rsum_' + row.replace(/[^a-z0-9]/gi, '_');
+  const rowTot = rowSummaryDisplay(Array.from(rowInputs).map(i => i.dataset.col), rowData);
+  const el = document.getElementById(rowSumId);
+  if (el) el.textContent = rowTot;
+}
+
+// 구버전 호환용 (혹시 남아있다면)
+function updateRowSum(input) { updateTableRow(input); }
+
+function savePerf() {
+  const month  = parseInt(document.getElementById('pf-month').value);
+  const critId = document.getElementById('pf-crit').value;
+  if (!month || !critId) { alert('월과 기준을 선택하세요.'); return; }
+
+  const p = getProj(); if (!p) return;
+  const y  = D.settings.activeYear;
+  const yd = getYearData(p, y);
+  const crit = (yd.performanceCriteria || []).find(c => c.id === critId);
+  if (!p.performanceRecords) p.performanceRecords = [];
+
+  const id = document.getElementById('pf-id').value;
+  const base = { year: y, month, critId,
+    mgr: getMgrComboValue('pf-mgr'),
+    note: document.getElementById('pf-note').value };
+
+  let obj;
+  if (crit?.type === 'table') {
+    // 테이블형: 입력 열만 저장 (수식 열은 저장하지 않음 — 표시 시 재계산)
+    const inputs = document.querySelectorAll('#pf-table-grid input[data-row]');
+    const tableData = {};
+    inputs.forEach(inp => {
+      const row = inp.dataset.row;
+      const col = inp.dataset.col;
+      if (!tableData[row]) tableData[row] = {};
+      tableData[row][col] = parseInt(inp.value) || 0;
+    });
+    obj = { id: id || uid(), ...base, type: 'table', tableData };
+  } else {
+    const val = parseFloat(document.getElementById('pf-val').value);
+    if (isNaN(val)) { alert('실적 값을 입력하세요.'); return; }
+    obj = { id: id || uid(), ...base, type: 'simple', val };
+  }
+
+  // 같은 crit+month+year 중복 제거 후 저장 (id가 다른 동일 조합 제거)
+  p.performanceRecords = p.performanceRecords.filter(r =>
+    !(r.critId === critId && r.month === month && r.year === y && r.id !== obj.id)
+  );
+  const idx = id ? p.performanceRecords.findIndex(x => x.id === id) : -1;
+  if (idx >= 0) p.performanceRecords[idx] = obj;
+  else p.performanceRecords.push(obj);
+  save(); bootstrap.Modal.getInstance(document.getElementById('mPerf')).hide();
+  perfViewMonth = month;
+  renderDetail();
+}
+
+function delPerf(id) {
+  if (!confirm('삭제하시겠습니까?')) return;
+  const p = getProj(); if (!p) return;
+  p.performanceRecords = (p.performanceRecords || []).filter(r => r.id !== id);
+  save(); renderDetail();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  EXCEL EXPORT
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// 사업 하나의 전체 데이터를 aoa(배열의 배열)로 반환
+function buildProjAoa(p, y) {
+  const yd       = getYearData(p, y);
+  const cats     = yd.budgetCategories || [];
+  const crits    = yd.performanceCriteria || [];
+  const recs     = yearPerfRecs(p, y);
+  const mos      = [1,2,3,4,5,6,7,8,9,10,11,12];
+  const _thisMonth = new Date().getMonth() + 1;
+  const curMonth   = _thisMonth > 1 ? _thisMonth - 1 : 12;  // 전월 기준 (1월이면 12월)
+  const moLbls   = mos.map(m => m + '월 누계');
+  let aoa = [];
+
+  // ── 제목 ──
+  aoa.push([p.name + '  (' + y + '년)']);
+  aoa.push(['담당자: ' + (projMgrDisplay(p) || '—')]);
+  aoa.push(['기준: ' + y + '년 ' + curMonth + '월 (전월 기준)']);
+  aoa.push([]);
+
+  // ── 총 예산 현황 ──
+  const exps       = yearExpenses(p, y);
+  const catExpMap  = {};
+  const itemExpMap = {};
+  exps.forEach(e => {
+    catExpMap[e.catId]  = (catExpMap[e.catId]  || 0) + e.amount;
+    if (e.itemId) itemExpMap[e.itemId] = (itemExpMap[e.itemId] || 0) + e.amount;
+  });
+  const totalBudget = cats.reduce((s, c) => s + (c.budget || 0), 0);
+  const totalUsed   = exps.reduce((s, e) => s + e.amount, 0);
+
+  aoa.push(['■ 총 예산 현황']);
+  aoa.push(['예산 과목', '세부 항목', '배정 예산(원)', '사용액(원)', '잔액(원)', '사용률']);
+  cats.forEach(c => {
+    const cUsed = catExpMap[c.id] || 0;
+    const cBdg  = c.budget || 0;
+    const cRate = cBdg > 0 ? ((cUsed / cBdg) * 100).toFixed(1) + '%' : '-';
+    aoa.push([c.name, '', cBdg, cUsed, cBdg - cUsed, cRate]);
+    (c.items || []).forEach(it => {
+      const iUsed = itemExpMap[it.id] || 0;
+      const iBdg  = it.budget || 0;
+      const iLeft = iBdg > 0 ? iBdg - iUsed : '-';
+      const iRate = iBdg > 0 ? ((iUsed / iBdg) * 100).toFixed(1) + '%' : '-';
+      aoa.push(['', it.name, iBdg || '-', iUsed || '-', iLeft, iRate]);
+    });
+  });
+  const totalRate = totalBudget > 0 ? ((totalUsed / totalBudget) * 100).toFixed(1) + '%' : '-';
+  aoa.push(['합계', '', totalBudget, totalUsed, totalBudget - totalUsed, totalRate]);
+  aoa.push([]);
+
+  // ── 실적 현황 (누계) ──
+  aoa.push(['■ 실적 현황 (누계)']);
+  aoa.push(['실적 기준', '단위', '목표', ...moLbls, '연간 누계', '달성률']);
+  crits.forEach(c => {
+    // 월별 단위 값
+    const byMo = {};
+    mos.forEach(m => {
+      if (c.type === 'table') {
+        const rec    = recs.find(r => r.critId === c.id && r.month === m);
+        const td     = rec?.tableData || {};
+        const inCols = inputCols(c.cols || []);
+        let sum = 0;
+        (c.rows || []).forEach(row => {
+          const rd = computeRowData(c.cols || [], td[row] || {});
+          inCols.forEach(col => { sum += parseFloat(rd[col]) || 0; });
+        });
+        byMo[m] = sum;
+      } else {
+        byMo[m] = recs.filter(r => r.critId === c.id && r.month === m)
+                      .reduce((s, r) => s + (r.val || 0), 0);
+      }
+    });
+    // 누계 계산: 현재 월까지만, 데이터 없으면 빈칸
+    const cumByMo = {};
+    let cum = 0;
+    mos.forEach(m => { cum += byMo[m] || 0; cumByMo[m] = cum; });
+    const tot = mos.filter(m => m <= curMonth).reduce((s, m) => s + (byMo[m] || 0), 0);
+    const ar  = c.target > 0 ? ((tot / c.target) * 100).toFixed(1) + '%' : '-';
+    aoa.push([
+      c.name, c.unit || '', c.target || 0,
+      ...mos.map(m => {
+        if (m > curMonth) return '';          // 미래 월 → 빈칸
+        const v = cumByMo[m] || 0;
+        return v === 0 ? '' : v;             // 누계 0이면 빈칸
+      }),
+      tot || '', ar
+    ]);
+  });
+  aoa.push([]);
+
+  // ── 실적 입력 내역 (해당 월만) ──
+  const simpleRecs = recs.filter(r => {
+    const c = crits.find(c => c.id === r.critId);
+    return c && c.type !== 'table' && r.month === curMonth;
+  }).sort((a, b) => a.month - b.month);
+
+  aoa.push(['■ ' + curMonth + '월 실적 입력 내역']);
+  if (simpleRecs.length) {
+    aoa.push(['월', '실적 기준', '실적 값', '단위', '담당자', '비고']);
+    simpleRecs.forEach(r => {
+      const c = crits.find(c => c.id === r.critId);
+      aoa.push([r.month + '월', c ? c.name : '(삭제됨)', r.val || 0, c?.unit || '', r.mgr || '', r.note || '']);
+    });
+  } else {
+    aoa.push([curMonth + '월 입력된 실적이 없습니다.']);
+  }
+  aoa.push([]);
+
+  // ── 세부 실적 (테이블형, 해당 월만) ──
+  const tableCrits = crits.filter(c => c.type === 'table');
+  if (tableCrits.length) {
+    aoa.push(['■ ' + curMonth + '월 세부 실적 (테이블형)']);
+    tableCrits.forEach(c => {
+      const rec = recs.find(r => r.critId === c.id && r.month === curMonth);
+      if (!rec || !rec.tableData) return;
+      const colNames = allColNames(c.cols || []);
+      const trows    = c.rows || [];
+      const td       = rec.tableData;
+      aoa.push([]);
+      aoa.push([`[${c.name}]  ${curMonth}월`]);
+      aoa.push(['', ...colNames, '행합계']);
+      trows.forEach(row => {
+        const rd     = computeRowData(c.cols || [], td[row] || {});
+        const inCols = inputCols(c.cols || []);
+        const rowTot = inCols.reduce((s, col) => s + (parseFloat(rd[col]) || 0), 0);
+        aoa.push([row, ...colNames.map(col => rd[col] ?? 0), rowTot]);
+      });
+      const colTots = colNames.map(col =>
+        trows.reduce((s, row) => {
+          const rd = computeRowData(c.cols || [], td[row] || {});
+          return s + (parseFloat(rd[col]) || 0);
+        }, 0)
+      );
+      aoa.push(['합계', ...colTots, colTots.reduce((s, v) => s + v, 0)]);
+    });
+  }
+
+  return aoa;
+}
+
+function exportProjExcel() {
+  const p = getProj(); if (!p) return;
+  const y = D.settings.activeYear;
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(buildProjAoa(p, y)),
+    p.name.slice(0, 31));
+  XLSX.writeFile(wb, p.name + '_' + y + '년.xlsx');
+}
+
+function exportExcelAll() {
+  const y  = D.settings.activeYear;
+  const wb = XLSX.utils.book_new();
+
+  // 전체 요약 시트
+  const summaryRows = [
+    ['전체 사업 요약  (' + y + '년)'],
+    ['사업명', '담당자', '총 예산(원)', '사용액(원)', '잔액(원)', '사용률'],
+    ...D.projects.map(p => {
+      const yd   = getYearData(p, y);
+      const used = totalExpenses(p, y);
+      const left = (yd.totalBudget || 0) - used;
+      const rate = yd.totalBudget > 0 ? ((used / yd.totalBudget) * 100).toFixed(1) + '%' : '-';
+      return [p.name, projMgrDisplay(p) || '', yd.totalBudget || 0, used, left, rate];
+    })
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryRows), '전체 요약');
+
+  // 사업별 시트
+  D.projects.forEach(p => {
+    const sheetName = p.name.slice(0, 31);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(buildProjAoa(p, y)), sheetName);
+  });
+
+  XLSX.writeFile(wb, '전체사업_' + y + '년.xlsx');
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  JSON EXPORT / IMPORT
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(D, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '사업관리_데이터_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+}
+
+function importJSON(ev) {
+  const file = ev.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (confirm('기존 데이터를 가져온 데이터로 교체하시겠습니까?')) {
+        D = data; save();
+        document.getElementById('brand-name').textContent = D.settings?.org || '사업 관리 시스템';
+        buildYearSelector(); rebuildProjNav(); go('dashboard');
+        alert('데이터를 성공적으로 불러왔습니다.');
+      }
+    } catch(err) { alert('파일을 읽는 데 실패했습니다.'); }
+  };
+  reader.readAsText(file);
+  ev.target.value = '';
+}
+
+function fmt(n) { return (n || 0).toLocaleString('ko-KR'); }
+
+async function initApp() {
+  // ── 한 번만 실행: localStorage → Supabase 마이그레이션 ──
+  if (!localStorage.getItem('gamsi_migrated')) {
+    try {
+      const local = JSON.parse(localStorage.getItem(KEY) || 'null');
+      if (local && (local.projects?.length > 0 || Object.keys(local.schedule || {}).length > 0)) {
+        await sb.from('app_state')
+          .upsert({ id: 1, data: local, updated_at: new Date().toISOString() });
+        localStorage.setItem('gamsi_migrated', '1');
+        D = local;
+        console.log('✅ 기존 데이터 Supabase 마이그레이션 완료');
+      } else {
+        D = await loadData();
+      }
+    } catch(e) {
+      D = await loadData();
+    }
+  } else {
+    D = await loadData();
+  }
+
+  document.getElementById('brand-name').textContent = D.settings.org || '사업 관리 시스템';
+  buildYearSelector();
+  rebuildProjNav();
+  renderDashboard();
+  setTimeout(checkNewYear, 500);
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!checkAuth()) {
+    document.getElementById('login-pw').focus();
+  } else {
+    await initApp();
+  }
+});
+</script>
+</body>
+</html>
